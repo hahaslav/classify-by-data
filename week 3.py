@@ -118,14 +118,17 @@ def _(mo):
 @app.cell
 def _(
     train_app_activity_extracted_features,
+    train_communications_extracted_features,
     train_transactions_extracted_features,
 ):
-    features_list = list(train_transactions_extracted_features.columns) + list(train_app_activity_extracted_features.columns) + ["count_app_activity_per_user", "count_communications_per_user", "count_transactions_per_user", "days_old_ACTIVITY_DATE"]
+    features_list = list(train_transactions_extracted_features.columns) + list(train_app_activity_extracted_features.columns) + list(train_communications_extracted_features.columns) + ["count_app_activity_per_user", "count_communications_per_user", "count_transactions_per_user", "days_old_ACTIVITY_DATE"]
     train_transactions_extracted_features_medians = train_transactions_extracted_features.median()
     train_app_activity_extracted_features_medians = train_app_activity_extracted_features.median()
+    train_communications_extracted_features_medians = train_communications_extracted_features.median()
     return (
         features_list,
         train_app_activity_extracted_features_medians,
+        train_communications_extracted_features_medians,
         train_transactions_extracted_features_medians,
     )
 
@@ -135,14 +138,17 @@ def _(
     clients_df,
     duckdb,
     indexed_app_activity_extracted_features,
+    indexed_communications_extracted_features,
     indexed_transactions_extracted_features,
     my_features,
     train_app_activity_extracted_features_medians,
+    train_communications_extracted_features_medians,
     train_transactions_extracted_features_medians,
 ):
-    def prepare_dataset(clients_df, transactions_extracted_features, app_activity_extracted_features, my_features):
+    def prepare_dataset(clients_df, transactions_extracted_features, app_activity_extracted_features, communications_extracted_features, my_features):
         indexed_transactions_extracted_features = transactions_extracted_features.reset_index()
         indexed_app_activity_extracted_features = app_activity_extracted_features.reset_index()
+        indexed_communications_extracted_features = communications_extracted_features.reset_index()
         df_with_all_clients = duckdb.sql(
             f"""
             SELECT
@@ -151,10 +157,11 @@ def _(
                 clients_df
                 LEFT JOIN indexed_transactions_extracted_features ON indexed_transactions_extracted_features.index = clients_df.CLIENT_ID
                 LEFT JOIN indexed_app_activity_extracted_features ON indexed_app_activity_extracted_features.index = clients_df.CLIENT_ID
+                LEFT JOIN indexed_communications_extracted_features ON indexed_communications_extracted_features.index = clients_df.CLIENT_ID
                 LEFT JOIN my_features ON my_features.CLIENT_ID = clients_df.CLIENT_ID
             """
         ).df()
-        return df_with_all_clients.fillna(train_transactions_extracted_features_medians).fillna(train_app_activity_extracted_features_medians)
+        return df_with_all_clients.fillna(train_transactions_extracted_features_medians).fillna(train_app_activity_extracted_features_medians).fillna(train_communications_extracted_features_medians)
     return (prepare_dataset,)
 
 
@@ -163,15 +170,17 @@ def _(
     prepare_dataset,
     train_app_activity_extracted_features,
     train_clients,
+    train_communications_extracted_features,
     train_my_features,
     train_transactions_extracted_features,
     validate_app_activity_extracted_features,
     validate_clients,
+    validate_communications_extracted_features,
     validate_my_features,
     validate_transactions_extracted_features,
 ):
-    train_df = prepare_dataset(train_clients, train_transactions_extracted_features, train_app_activity_extracted_features, train_my_features)
-    validate_df = prepare_dataset(validate_clients, validate_transactions_extracted_features, validate_app_activity_extracted_features, validate_my_features)
+    train_df = prepare_dataset(train_clients, train_transactions_extracted_features, train_app_activity_extracted_features, train_communications_extracted_features, train_my_features)
+    validate_df = prepare_dataset(validate_clients, validate_transactions_extracted_features, validate_app_activity_extracted_features, validate_communications_extracted_features, validate_my_features)
     return train_df, validate_df
 
 
@@ -399,6 +408,57 @@ def _(extract_app_activity_features, train_app_activity_numerified):
 def _(extract_app_activity_features, validate_app_activity_numerified):
     validate_app_activity_extracted_features = extract_app_activity_features(validate_app_activity_numerified)
     return (validate_app_activity_extracted_features,)
+
+
+@app.cell
+def _(df, duckdb):
+    def numerify_communications(df):
+        df = df.copy()
+        df.loc[:, "communications_CAT_C3_float"] = df["CAT_C3"].astype("float64").fillna(0)
+        df.loc[:, "communications_CAT_C4_float"] = df["CAT_C4"].astype("float64").fillna(0)
+        return duckdb.sql(
+            f"""
+            SELECT
+                df.CLIENT_ID,
+                df.CONTACT_DATE,
+                df.communications_CAT_C3_float,
+                df.communications_CAT_C4_float
+            FROM
+            	df
+            """
+        ).df()
+    return (numerify_communications,)
+
+
+@app.cell
+def _(numerify_communications, train_communications):
+    train_communications_numerified = numerify_communications(train_communications)
+    return (train_communications_numerified,)
+
+
+@app.cell
+def _(numerify_communications, validate_communications):
+    validate_communications_numerified = numerify_communications(validate_communications)
+    return (validate_communications_numerified,)
+
+
+@app.cell
+def _(MinimalFCParameters, extract_features):
+    def extract_communications_features(df):
+        return extract_features(df, column_id="CLIENT_ID", column_sort="CONTACT_DATE", default_fc_parameters=MinimalFCParameters())
+    return (extract_communications_features,)
+
+
+@app.cell
+def _(extract_communications_features, train_communications_numerified):
+    train_communications_extracted_features = extract_communications_features(train_communications_numerified)
+    return (train_communications_extracted_features,)
+
+
+@app.cell
+def _(extract_communications_features, validate_communications_numerified):
+    validate_communications_extracted_features = extract_communications_features(validate_communications_numerified)
+    return (validate_communications_extracted_features,)
 
 
 @app.cell(hide_code=True)
