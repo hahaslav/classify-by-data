@@ -17,7 +17,7 @@ def _(feature_importance, features_list, plt, sns):
     sns.set_style("whitegrid")
 
     plt.rcParams["figure.dpi"] = 160
-    plt.figure(figsize=(10, len(features_list) / 4))
+    plt.figure(figsize=(10, len(features_list) / 4.5))
 
     sns.barplot(x='Coefficient', y='Feature', data=feature_importance)
 
@@ -286,12 +286,12 @@ def _(df, duckdb):
             SELECT
                 df.CLIENT_ID,
                 df.TRAN_DATE,
-                df.FLOAT_C16,
-                df.FLOAT_C17,
-                df.FLOAT_C18,
-                df.INT_C19,
-                df.FLOAT_C20,
-                df.FLOAT_C21
+                df.FLOAT_C16 as transactions_FLOAT_C16,
+                df.FLOAT_C17 as transactions_FLOAT_C17,
+                df.FLOAT_C18 as transactions_FLOAT_C18,
+                df.INT_C19 as transactions_INT_C19,
+                df.FLOAT_C20 as transactions_FLOAT_C20,
+                df.FLOAT_C21 as transactions_FLOAT_C21
             FROM
                 df
             """
@@ -321,12 +321,20 @@ def _(extract_transactions_features, train_transactions_numerified):
 @app.cell
 def _(df, duckdb):
     def numerify_app_activity(df):
+        df.loc[:, "app_activity_CAT_C3_float"] = df["CAT_C3"].astype("float64").fillna(0)
+        df.loc[:, "app_activity_CAT_C4_float"] = df["CAT_C4"].astype("float64").fillna(0)
+        df.loc[:, "app_activity_CAT_C5_float"] = df["CAT_C5"].astype("float64").fillna(0)
+        df.loc[:, "app_activity_CAT_C6_float"] = df["CAT_C6"].astype("float64").fillna(0)
         return duckdb.sql(
             f"""
             SELECT
                 df.CLIENT_ID,
                 df.ACTIVITY_DATE,
-                df.DEVICE_ID
+                df.DEVICE_ID as app_activity_DEVICE_ID,
+                df.app_activity_CAT_C3_float,
+                df.app_activity_CAT_C4_float,
+                df.app_activity_CAT_C5_float,
+                df.app_activity_CAT_C6_float
             FROM
             	df
             """
@@ -376,7 +384,7 @@ def _(mo, table_selector):
     return
 
 
-@app.cell(disabled=True, hide_code=True)
+@app.cell(hide_code=True)
 def _(mo, table_selector):
     _df = mo.sql(
         f"""
