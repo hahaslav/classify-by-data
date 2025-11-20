@@ -5,23 +5,19 @@ app = marimo.App(width="medium")
 
 
 @app.cell(hide_code=True)
-def _(gini_test, gini_train, mo):
-    mo.md(rf"""
-    ## Коефіцієнти Gini
-
-    Тренувальна вибірка: {gini_train:.4f}
-
-    Тестова вибірка: {gini_test:.4f}
+def _(mo):
+    mo.md(r"""
+    ## Feature importance
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(feature_importance, plt, sns):
+def _(feature_importance, features_list, plt, sns):
     sns.set_style("whitegrid")
 
     plt.rcParams["figure.dpi"] = 160
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(10, len(features_list) / 4))
 
     sns.barplot(x='Coefficient', y='Feature', data=feature_importance)
 
@@ -33,381 +29,20 @@ def _(feature_importance, plt, sns):
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Data playground
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(app_activity, mo):
-    app_activity
-    table_selector = mo.ui.dropdown(["app_activity", "communications", "transactions"], value="app_activity", label="Таблиця")
-    target_switch = mo.ui.checkbox(label="Відкрив депозит")
-    return table_selector, target_switch
-
-
-@app.cell(hide_code=True)
-def _(mo, table_selector, target_switch):
+def _(mo, train_gini):
     mo.md(rf"""
-    {table_selector}
+    ## Коефіцієнти Gini
 
-    {target_switch}
+    Тренувальна вибірка: {train_gini:.4f}
+
+    Валідаційна вибірка: {0:.4f}
+
+    {mo.accordion(
+        {
+            "Тестова вибірка: ": mo.md(f"Поточна: {0:.4f}\n\nМинула: 0.4921")}
+    )}
     """)
     return
-
-
-@app.cell
-def _(mo, table_selector, target_switch):
-    _df = mo.sql(
-        f"""
-        SELECT
-            *
-        FROM
-            {table_selector.value}
-            JOIN clients_sample ON {table_selector.value}.CLIENT_ID = clients_sample.CLIENT_ID
-        WHERE
-            clients_sample.IS_TRAIN = 'true'
-            AND clients_sample.TARGET = '{target_switch.value}'
-        LIMIT
-            1000000;
-        """
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Features
-    """)
-    return
-
-
-@app.cell
-def _(app_activity, clients_sample, mo):
-    count_app_activity_per_user_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            COUNT(clients_sample.CLIENT_ID) AS 'count',
-        FROM
-            app_activity
-            JOIN clients_sample ON app_activity.CLIENT_ID = clients_sample.CLIENT_ID
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return (count_app_activity_per_user_df,)
-
-
-@app.cell
-def _(clients_sample, mo, transactions):
-    count_transactions_per_user_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            COUNT(clients_sample.CLIENT_ID) AS 'count',
-        FROM
-            transactions
-            JOIN clients_sample ON transactions.CLIENT_ID = clients_sample.CLIENT_ID
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return (count_transactions_per_user_df,)
-
-
-@app.cell
-def _(clients_sample, communications, mo):
-    count_communications_per_user_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            COUNT(clients_sample.CLIENT_ID) AS 'count',
-        FROM
-            communications
-            JOIN clients_sample ON communications.CLIENT_ID = clients_sample.CLIENT_ID
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return (count_communications_per_user_df,)
-
-
-@app.cell
-def _(clients_sample, mo, transactions):
-    avg_transactions_FLOAT_C18_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            AVG(transactions.FLOAT_C18) AS 'avg',
-        FROM
-            transactions
-            JOIN clients_sample ON transactions.CLIENT_ID = clients_sample.CLIENT_ID
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return
-
-
-@app.cell
-def _(clients_sample, mo, transactions):
-    count_transactions_INT_C19_eq_minus_1_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            COUNT(clients_sample.CLIENT_ID) AS 'count',
-        FROM
-            transactions
-            JOIN clients_sample ON transactions.CLIENT_ID = clients_sample.CLIENT_ID
-        WHERE
-            transactions.INT_C19 = -1
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return
-
-
-@app.cell
-def _(clients_sample, mo, transactions):
-    count_transactions_INT_C19_eq_plus_1_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            COUNT(clients_sample.CLIENT_ID) AS 'count',
-        FROM
-            transactions
-            JOIN clients_sample ON transactions.CLIENT_ID = clients_sample.CLIENT_ID
-        WHERE
-            transactions.INT_C19 = 1
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return
-
-
-@app.cell
-def _(clients_sample, communications, mo):
-    count_communications_CAT_C4_eq_3_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            COUNT(clients_sample.CLIENT_ID) AS 'count',
-        FROM
-            communications
-            JOIN clients_sample ON communications.CLIENT_ID = clients_sample.CLIENT_ID
-        WHERE
-            communications.CAT_C4 = '3'
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return
-
-
-@app.cell
-def _(app_activity, clients_sample, mo):
-    count_app_activity_CAT_C6_eq_1_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            COUNT(clients_sample.CLIENT_ID) AS 'count',
-        FROM
-            app_activity
-            JOIN clients_sample ON app_activity.CLIENT_ID = clients_sample.CLIENT_ID
-        WHERE
-            app_activity.CAT_C6 = '1'
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return
-
-
-@app.cell
-def _(app_activity, clients_sample, mo):
-    count_app_activity_CAT_C9_eq_1_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            COUNT(clients_sample.CLIENT_ID) AS 'count',
-        FROM
-            app_activity
-            JOIN clients_sample ON app_activity.CLIENT_ID = clients_sample.CLIENT_ID
-        WHERE
-            app_activity.CAT_C9 = '1'
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return
-
-
-@app.cell
-def _(app_activity, clients_sample, mo):
-    num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            MIN(app_activity.ACTIVITY_DATE) AS 'min'
-        FROM
-            app_activity
-            JOIN clients_sample ON app_activity.CLIENT_ID = clients_sample.CLIENT_ID
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """,
-        output=False
-    )
-    return (num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df,)
-
-
-@app.cell
-def _(num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df, pd):
-    target_date = pd.to_datetime('2025-09-01')
-    num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df['time_diff'] = target_date - num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df['min']
-    num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df['int'] = num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df['time_diff'].dt.days
-    return
-
-
-@app.cell
-def _(
-    avg_transactions_float_c18_df,
-    clients_sample,
-    count_app_activity_cat_c6_eq_1_df,
-    count_app_activity_cat_c9_eq_1_df,
-    count_app_activity_per_user_df,
-    count_communications_cat_c4_eq_3_df,
-    count_communications_per_user_df,
-    count_transactions_int_c19_eq_minus_1_df,
-    count_transactions_int_c19_eq_plus_1_df,
-    count_transactions_per_user_df,
-    mo,
-    num_of_days_from_app_activity_min_activity_date_to_2025_09_01_df,
-):
-    features_df = mo.sql(
-        f"""
-        SELECT
-            COALESCE(
-                ANY_VALUE(count_app_activity_per_user_df.count),
-                0
-            ) as 'count_app_activity_per_user',
-            COALESCE(
-                ANY_VALUE(count_transactions_per_user_df.count),
-                0
-            ) as 'count_transactions_per_user',
-            COALESCE(
-                ANY_VALUE(count_communications_per_user_df.count),
-                0
-            ) as 'count_communications_per_user',
-            COALESCE(ANY_VALUE(avg_transactions_FLOAT_C18_df.avg), 0) as 'avg_transactions_FLOAT_C18',
-            COALESCE(
-                ANY_VALUE(count_transactions_INT_C19_eq_minus_1_df.count),
-                0
-            ) / (
-                COALESCE(
-                    ANY_VALUE(count_transactions_INT_C19_eq_minus_1_df.count),
-                    1
-                ) + COALESCE(
-                    ANY_VALUE(count_transactions_INT_C19_eq_plus_1_df.count),
-                    0
-                )
-            ) as 'percent_count_transactions_INT_C19_eq_minus_1',
-            COALESCE(
-                ANY_VALUE(count_communications_CAT_C4_eq_3_df.count),
-                0
-            ) / COALESCE(
-                ANY_VALUE(count_communications_per_user_df.count),
-                1
-            ) as 'percent_communications_CAT_C4_eq_3',
-            COALESCE(
-                ANY_VALUE(count_app_activity_CAT_C6_eq_1_df.count),
-                0
-            ) / COALESCE(
-                ANY_VALUE(count_app_activity_per_user_df.count),
-                1
-            ) as 'percent_app_activity_CAT_C6_eq_1',
-            COALESCE(
-                ANY_VALUE(count_app_activity_CAT_C9_eq_1_df.count),
-                0
-            ) / COALESCE(
-                ANY_VALUE(count_app_activity_per_user_df.count),
-                1
-            ) as 'percent_app_activity_CAT_C9_eq_1',
-            COALESCE(
-                ANY_VALUE(
-                    num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df.int
-                ),
-                180
-            ) as 'num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01',
-            ANY_VALUE(clients_sample.TARGET) AS 'TARGET',
-            ANY_VALUE(clients_sample.IS_TRAIN) AS 'IS_TRAIN'
-        FROM
-            clients_sample
-            LEFT JOIN count_app_activity_per_user_df ON count_app_activity_per_user_df.CLIENT_ID = clients_sample.CLIENT_ID
-            LEFT JOIN count_transactions_per_user_df ON count_transactions_per_user_df.CLIENT_ID = clients_sample.CLIENT_ID
-            LEFT JOIN count_communications_per_user_df ON count_communications_per_user_df.CLIENT_ID = clients_sample.CLIENT_ID
-            LEFT JOIN avg_transactions_FLOAT_C18_df ON avg_transactions_FLOAT_C18_df.CLIENT_ID = clients_sample.CLIENT_ID
-            LEFT JOIN count_transactions_INT_C19_eq_minus_1_df ON count_transactions_INT_C19_eq_minus_1_df.CLIENT_ID = clients_sample.CLIENT_ID
-            LEFT JOIN count_transactions_INT_C19_eq_plus_1_df ON count_transactions_INT_C19_eq_plus_1_df.CLIENT_ID = clients_sample.CLIENT_ID
-            LEFT JOIN count_communications_CAT_C4_eq_3_df ON count_communications_CAT_C4_eq_3_df.CLIENT_ID = clients_sample.CLIENT_ID
-            LEFT JOIN count_app_activity_CAT_C6_eq_1_df ON count_app_activity_CAT_C6_eq_1_df.CLIENT_ID = clients_sample.CLIENT_ID
-            LEFT JOIN count_app_activity_CAT_C9_eq_1_df ON count_app_activity_CAT_C9_eq_1_df.CLIENT_ID = clients_sample.CLIENT_ID
-            LEFT JOIN num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df ON num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01_df.CLIENT_ID = clients_sample.CLIENT_ID
-        GROUP BY
-            clients_sample.CLIENT_ID;
-        """
-    )
-    return (features_df,)
-
-
-@app.cell
-def _():
-    features = ['count_app_activity_per_user', 'count_transactions_per_user', 'count_communications_per_user', 'avg_transactions_FLOAT_C18', 'percent_count_transactions_INT_C19_eq_minus_1', 'percent_communications_CAT_C4_eq_3', 'percent_app_activity_CAT_C6_eq_1', 'percent_app_activity_CAT_C9_eq_1', 'num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01']
-    return (features,)
-
-
-@app.cell
-def _(features_df, mo):
-    training_df = mo.sql(
-        f"""
-        SELECT
-            *
-        FROM
-            features_df
-        WHERE
-            IS_TRAIN = 'true';
-        """
-    )
-    return (training_df,)
-
-
-@app.cell
-def _(features_df, mo):
-    test_df = mo.sql(
-        f"""
-        SELECT
-            *
-        FROM
-            features_df
-        WHERE
-            IS_TRAIN = 'false';
-        """
-    )
-    return (test_df,)
 
 
 @app.cell(hide_code=True)
@@ -423,200 +58,44 @@ def gini(roc_auc):
     return 2 * roc_auc - 1
 
 
-@app.cell(hide_code=True)
-def _(
-    LogisticRegression,
-    StandardScaler,
-    features,
-    roc_auc_score,
-    test_df,
-    training_df,
-):
-    features_train = training_df[features]
-    target_train = training_df['TARGET'].astype(int)
-
-    scaler = StandardScaler()
-    features_train_scaled = scaler.fit_transform(features_train)
-
-    model = LogisticRegression(random_state=32, class_weight='balanced')
-    model.fit(features_train_scaled, target_train)
-
-    train_proba = model.predict_proba(features_train_scaled)[:, 1]
-
-    features_test = test_df[features]
-    target_test = test_df['TARGET'].astype(int)
-    features_test_scaled = scaler.transform(features_test)
-    target_pred = model.predict(features_test_scaled)
-    target_proba = model.predict_proba(features_test_scaled)[:, 1]
-
-    roc_auc_train = roc_auc_score(target_train, train_proba)
-    gini_train = gini(roc_auc_train)
-
-    roc_auc_test = roc_auc_score(target_test, target_proba)
-    gini_test = gini(roc_auc_test)
-    return gini_test, gini_train, model, target_pred, target_proba
-
-
-@app.cell(hide_code=True)
-def _(target_pred, target_proba, test_df):
-    result_df = test_df
-    result_df['pred_prob'] = target_proba
-    result_df['pred_bool'] = target_pred.astype(bool)
-    result_df['match'] = result_df['TARGET'] == result_df['pred_bool']
-    result_df
-    return
-
-
-@app.cell
-def _(clients_sample, mo, transactions):
-    ts_df = mo.sql(
-        f"""
-        SELECT
-            clients_sample.CLIENT_ID,
-            transactions.TRAN_DATE,
-            transactions.FLOAT_C18,
-            transactions.FLOAT_C21
-        FROM
-            transactions
-            JOIN clients_sample ON transactions.CLIENT_ID = clients_sample.CLIENT_ID
-        WHERE
-            clients_sample.IS_TRAIN = 'true'
-        LIMIT
-            200000;
-        """,
-        output=False
-    )
-    return (ts_df,)
-
-
-@app.cell
-def _(extract_features, ts_df):
-    my_extracted_features = extract_features(ts_df, column_id="CLIENT_ID", column_sort="TRAN_DATE")
-    return (my_extracted_features,)
-
-
-@app.cell
-def _(my_extracted_features):
-    indexed_my_extracted_features = my_extracted_features.reset_index()
-    indexed_my_extracted_features
-    return (indexed_my_extracted_features,)
-
-
-@app.cell
-def _(clients_sample, indexed_my_extracted_features, mo):
-    fefe_df = mo.sql(
-        f"""
-        SELECT
-            *
-        FROM
-            indexed_my_extracted_features
-            JOIN clients_sample ON indexed_my_extracted_features.index = clients_sample.CLIENT_ID;
-        """
-    )
-    return (fefe_df,)
-
-
-@app.cell
-def _(fefe_df):
-    fefeatures = list(fefe_df.columns)
-    fefeatures.remove("index")
-    fefeatures.remove("COMMUNICATION_MONTH")
-    fefeatures.remove("IS_TRAIN")
-    fefeatures.remove("CLIENT_ID")
-    fefeatures.remove("FLOAT_C18__sample_entropy")
-    fefeatures.remove("FLOAT_C21__sample_entropy")
-    fefeatures.remove("FLOAT_C18__query_similarity_count__query_None__threshold_0.0")
-    fefeatures.remove("FLOAT_C21__query_similarity_count__query_None__threshold_0.0")
-    return (fefeatures,)
-
-
-@app.cell
-def _(fefe_df_filled):
-    import numpy as np
-    numeric_df = fefe_df_filled.select_dtypes(include=np.number)
-    is_inf_df = numeric_df.apply(np.isinf)
-    columns_with_inf = is_inf_df.any(axis=0)
-    columns_with_inf
-    return np, numeric_df
-
-
-@app.cell
-def _(np, numeric_df):
-    is_nan_df = numeric_df.apply(np.isnan)
-    columns_with_nan = is_nan_df.any(axis=0)
-    columns_with_nan
-    return
-
-
-@app.cell
-def _(fefe_df, fefeatures):
-    fefeatures_df = fefe_df[fefeatures]
-    column_medians = fefeatures_df.median()
-
-    fefe_df_filled = fefeatures_df.fillna(column_medians)
-    return (fefe_df_filled,)
-
-
-@app.cell
-def _(fefe_df, fefe_df_filled, train_test_split):
-    fetargets = fefe_df['TARGET'].astype(int)
-    train_fefeatures, test_fefeatures, train_fetarget, test_fetarget = train_test_split(fefe_df_filled, fetargets, test_size=0.3, random_state=32)
-    return test_fefeatures, test_fetarget, train_fefeatures, train_fetarget
-
-
 @app.cell
 def _(
     LogisticRegression,
     StandardScaler,
+    features_list,
     roc_auc_score,
-    test_fefeatures,
-    test_fetarget,
-    train_fefeatures,
-    train_fetarget,
+    train_df,
 ):
-    fescaler = StandardScaler()
-    fefeatures_train_scaled = fescaler.fit_transform(train_fefeatures)
+    train_features = train_df[features_list]
+    train_target = train_df['TARGET'].astype(int)
 
-    femodel = LogisticRegression(random_state=32, class_weight='balanced')
-    femodel.fit(fefeatures_train_scaled, train_fetarget)
+    second_scaler = StandardScaler()
+    train_features_scaled = second_scaler.fit_transform(train_features)
 
-    train_feproba = femodel.predict_proba(fefeatures_train_scaled)[:, 1]
+    second_model = LogisticRegression(random_state=32, max_iter=1000) # also try class_weight='balanced'
+    second_model.fit(train_features_scaled, train_target)
 
-    fefeatures_test_scaled = fescaler.transform(test_fefeatures)
-    target_feproba = femodel.predict_proba(fefeatures_test_scaled)[:, 1]
+    second_train_proba = second_model.predict_proba(train_features_scaled)[:, 1]
 
-    roc_auc_fetrain = roc_auc_score(train_fetarget, train_feproba)
-    gini_fetrain = gini(roc_auc_fetrain)
+    # features_test = test_df[features]
+    # target_test = test_df['TARGET'].astype(int)
+    # features_test_scaled = scaler.transform(features_test)
+    # target_pred = model.predict(features_test_scaled)
+    # target_proba = model.predict_proba(features_test_scaled)[:, 1]
 
-    roc_auc_fetest = roc_auc_score(test_fetarget, target_feproba)
-    gini_fetest = gini(roc_auc_fetest)
-    return gini_fetest, gini_fetrain
+    train_gini = gini(roc_auc_score(train_target, second_train_proba))
 
-
-@app.cell
-def _(gini_fetest, gini_fetrain, mo):
-    mo.md(rf"""
-    Тренувальна вибірка: {gini_fetrain:.4f}
-
-    Тестова вибірка: {gini_fetest:.4f}
-    """)
-    return
+    # roc_auc_test = roc_auc_score(target_test, target_proba)
+    # gini_test = gini(roc_auc_test)
+    return second_model, train_gini
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Feature importance
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(features, model, pd):
-    coefficients = model.coef_[0]
+def _(features_list, pd, second_model):
+    coefficients = second_model.coef_[0]
 
     feature_importance = pd.DataFrame({
-        'Feature': features,
+        'Feature': features_list,
         'Coefficient': coefficients
     })
 
@@ -627,6 +106,285 @@ def _(features, model, pd):
         ascending=False
     )
     return (feature_importance,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Підготовка згенерованих датасетів до тренування
+    """)
+    return
+
+
+@app.cell
+def _(train_transactions_extracted_features):
+    features_list = list(train_transactions_extracted_features.columns) + ["count_app_activity_per_user", "count_communications_per_user", "count_transactions_per_user", "days_old_ACTIVITY_DATE"]
+    train_transactions_extracted_features_medians = train_transactions_extracted_features.median()
+    return features_list, train_transactions_extracted_features_medians
+
+
+@app.cell
+def _(
+    clients_df,
+    duckdb,
+    indexed_transactions_extracted_features,
+    my_features,
+    train_transactions_extracted_features_medians,
+):
+    def prepare_dataset(clients_df, transactions_extracted_features, my_features):
+        indexed_transactions_extracted_features = transactions_extracted_features.reset_index()
+        df_with_all_clients = duckdb.sql(
+            f"""
+            SELECT
+                *
+            FROM
+                clients_df
+                LEFT JOIN indexed_transactions_extracted_features ON indexed_transactions_extracted_features.index = clients_df.CLIENT_ID
+                LEFT JOIN my_features ON my_features.CLIENT_ID = clients_df.CLIENT_ID
+            """
+        ).df()
+        return df_with_all_clients.fillna(train_transactions_extracted_features_medians)
+    return (prepare_dataset,)
+
+
+@app.cell
+def _(
+    prepare_dataset,
+    train_clients,
+    train_my_features,
+    train_transactions_extracted_features,
+):
+    train_df = prepare_dataset(train_clients, train_transactions_extracted_features, train_my_features)
+    return (train_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Генерація фіч
+    """)
+    return
+
+
+@app.cell
+def _(MinimalFCParameters, extract_features):
+    def extract_transactions_features(df):
+        return extract_features(df, column_id="CLIENT_ID", column_sort="TRAN_DATE", default_fc_parameters=MinimalFCParameters())
+    return (extract_transactions_features,)
+
+
+@app.cell
+def _(extract_transactions_features, train_transactions_numerified):
+    train_transactions_extracted_features = extract_transactions_features(train_transactions_numerified)
+    return (train_transactions_extracted_features,)
+
+
+@app.cell
+def _(df, duckdb):
+    def numerify_transactions(df):
+        return duckdb.sql(
+            f"""
+            SELECT
+                df.CLIENT_ID,
+                df.TRAN_DATE,
+                df.FLOAT_C16,
+                df.FLOAT_C17,
+                df.FLOAT_C18,
+                df.INT_C19,
+                df.FLOAT_C20,
+                df.FLOAT_C21
+            FROM
+                df
+            """
+        ).df()
+    return (numerify_transactions,)
+
+
+@app.cell
+def _(numerify_transactions, train_transactions):
+    train_transactions_numerified = numerify_transactions(train_transactions)
+    return (train_transactions_numerified,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Власні фічі
+    """)
+    return
+
+
+@app.cell
+def _(clients_df, df, duckdb):
+    def count_per_user(df, clients_df):
+        return duckdb.sql(
+            f"""
+            SELECT
+                clients_df.CLIENT_ID,
+                COUNT(clients_df.CLIENT_ID) AS 'count',
+            FROM
+                df
+                JOIN clients_df ON df.CLIENT_ID = clients_df.CLIENT_ID
+            GROUP BY
+                clients_df.CLIENT_ID;
+            """).df()
+    return (count_per_user,)
+
+
+@app.cell
+def _(
+    prepair_my_features,
+    train_app_activity,
+    train_clients,
+    train_communications,
+    train_transactions,
+):
+    train_my_features = prepair_my_features(train_app_activity, train_communications, train_transactions, train_clients)
+    return (train_my_features,)
+
+
+@app.cell
+def _(
+    app_activity_df,
+    clients_df,
+    count_app_activity_per_user,
+    count_communications_per_user,
+    count_per_user,
+    count_transactions_per_user,
+    days_old_activity_date,
+    df_with_all_clients_days_fillna,
+    duckdb,
+    pd,
+):
+    def prepair_my_features(app_activity_df, communications_df, transactions_df, clients_df):
+        count_app_activity_per_user = count_per_user(app_activity_df, clients_df)
+        count_communications_per_user = count_per_user(communications_df, clients_df)
+        count_transactions_per_user = count_per_user(transactions_df, clients_df)
+        days_old_ACTIVITY_DATE = duckdb.sql(
+            """
+            SELECT
+                clients_df.CLIENT_ID,
+                MIN(app_activity_df.ACTIVITY_DATE) AS 'min'
+            FROM
+                app_activity_df
+                JOIN clients_df ON app_activity_df.CLIENT_ID = clients_df.CLIENT_ID
+            GROUP BY
+                clients_df.CLIENT_ID;
+            """
+        ).df()
+        target_date = pd.to_datetime('2025-09-01')
+        days_old_ACTIVITY_DATE['time_diff'] = target_date - days_old_ACTIVITY_DATE['min']
+        days_old_ACTIVITY_DATE['int'] = days_old_ACTIVITY_DATE['time_diff'].dt.days
+        df_with_all_clients_days = duckdb.sql(
+            """
+            SELECT
+                clients_df.CLIENT_ID,
+                days_old_ACTIVITY_DATE.int as 'days_old_ACTIVITY_DATE',
+            FROM
+                clients_df
+                LEFT JOIN days_old_ACTIVITY_DATE ON days_old_ACTIVITY_DATE.CLIENT_ID = clients_df.CLIENT_ID
+            """
+        ).df()
+        df_with_all_clients_days_fillna = df_with_all_clients_days.fillna(180)
+        df_with_all_clients = duckdb.sql(
+            """
+            SELECT
+                df_with_all_clients_days_fillna.CLIENT_ID,
+                df_with_all_clients_days_fillna.days_old_ACTIVITY_DATE,
+                count_app_activity_per_user.count as 'count_app_activity_per_user',
+                count_communications_per_user.count as 'count_communications_per_user',
+                count_transactions_per_user.count as 'count_transactions_per_user'
+            FROM
+                df_with_all_clients_days_fillna
+                LEFT JOIN count_app_activity_per_user ON count_app_activity_per_user.CLIENT_ID = df_with_all_clients_days_fillna.CLIENT_ID
+                LEFT JOIN count_communications_per_user ON count_communications_per_user.CLIENT_ID = df_with_all_clients_days_fillna.CLIENT_ID
+                LEFT JOIN count_transactions_per_user ON count_transactions_per_user.CLIENT_ID = df_with_all_clients_days_fillna.CLIENT_ID
+            """
+        ).df()
+        return df_with_all_clients.fillna(0)
+    return (prepair_my_features,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Data playground
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo, train_app_activity):
+    train_app_activity
+    table_selector = mo.ui.dropdown(["train_app_activity", "train_communications", "train_transactions"], value="train_app_activity", label="Таблиця")
+    return (table_selector,)
+
+
+@app.cell(hide_code=True)
+def _(mo, table_selector):
+    mo.md(rf"""
+    {table_selector}
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo, table_selector):
+    _df = mo.sql(
+        f"""
+        SELECT
+            *
+        FROM
+            {table_selector.value}
+            JOIN clients_sample ON {table_selector.value}.CLIENT_ID = clients_sample.CLIENT_ID
+        """
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Підготовка валідаційного датасету
+    """)
+    return
+
+
+@app.cell
+def _(clients_sample, mo):
+    non_test_clients_df = mo.sql(
+        f"""
+        SELECT
+            clients_sample.CLIENT_ID,
+            clients_sample.TARGET,
+            clients_sample.COMMUNICATION_MONTH
+        FROM
+            clients_sample
+        WHERE
+            clients_sample.IS_TRAIN = TRUE
+        """,
+        output=False
+    )
+    return (non_test_clients_df,)
+
+
+@app.cell
+def _(non_test_clients_df, train_test_split):
+    train_clients, validate_clients = train_test_split(non_test_clients_df, test_size=0.25, random_state=32)
+    return (train_clients,)
+
+
+@app.function
+def filter_dataset_by_clients(df, filter):
+    return df[df['CLIENT_ID'].isin(filter['CLIENT_ID'])]
+
+
+@app.cell
+def _(app_activity, communications, train_clients, transactions):
+    train_app_activity = filter_dataset_by_clients(app_activity, train_clients)
+    train_communications = filter_dataset_by_clients(communications, train_clients)
+    train_transactions = filter_dataset_by_clients(transactions, train_clients)
+    return train_app_activity, train_communications, train_transactions
 
 
 @app.cell(hide_code=True)
@@ -755,8 +513,10 @@ def _():
     from sklearn.metrics import roc_auc_score
     from sklearn.model_selection import train_test_split
     from tsfresh import extract_features
+    from tsfresh.feature_extraction import MinimalFCParameters
     return (
         LogisticRegression,
+        MinimalFCParameters,
         StandardScaler,
         extract_features,
         roc_auc_score,
@@ -775,7 +535,28 @@ def _():
 def _():
     import marimo as mo
     import pandas as pd
-    return mo, pd
+    import duckdb
+    return duckdb, mo, pd
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Перший тиждень
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(rf"""
+    ## Коефіцієнти Gini
+
+    Тренувальна вибірка: 0.4918
+
+    Тестова вибірка: 0.4921
+    """)
+    return
 
 
 if __name__ == "__main__":
