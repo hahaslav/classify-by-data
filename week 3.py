@@ -72,7 +72,7 @@ def _(
     second_scaler = StandardScaler()
     train_features_scaled = second_scaler.fit_transform(train_features)
 
-    second_model = LogisticRegression(random_state=32, max_iter=1000) # also try class_weight='balanced'
+    second_model = LogisticRegression(random_state=32, max_iter=1000, class_weight='balanced') # also try class_weight='balanced'
     second_model.fit(train_features_scaled, train_target)
 
     second_train_proba = second_model.predict_proba(train_features_scaled)[:, 1]
@@ -117,22 +117,33 @@ def _(mo):
 
 
 @app.cell
-def _(train_transactions_extracted_features):
-    features_list = list(train_transactions_extracted_features.columns) + ["count_app_activity_per_user", "count_communications_per_user", "count_transactions_per_user", "days_old_ACTIVITY_DATE"]
+def _(
+    train_app_activity_extracted_features,
+    train_transactions_extracted_features,
+):
+    features_list = list(train_transactions_extracted_features.columns) + list(train_app_activity_extracted_features.columns) + ["count_app_activity_per_user", "count_communications_per_user", "count_transactions_per_user", "days_old_ACTIVITY_DATE"]
     train_transactions_extracted_features_medians = train_transactions_extracted_features.median()
-    return features_list, train_transactions_extracted_features_medians
+    train_app_activity_extracted_features_medians = train_app_activity_extracted_features.median()
+    return (
+        features_list,
+        train_app_activity_extracted_features_medians,
+        train_transactions_extracted_features_medians,
+    )
 
 
 @app.cell
 def _(
     clients_df,
     duckdb,
+    indexed_app_activity_extracted_features,
     indexed_transactions_extracted_features,
     my_features,
+    train_app_activity_extracted_features_medians,
     train_transactions_extracted_features_medians,
 ):
-    def prepare_dataset(clients_df, transactions_extracted_features, my_features):
+    def prepare_dataset(clients_df, transactions_extracted_features, app_activity_extracted_features, my_features):
         indexed_transactions_extracted_features = transactions_extracted_features.reset_index()
+        indexed_app_activity_extracted_features = app_activity_extracted_features.reset_index()
         df_with_all_clients = duckdb.sql(
             f"""
             SELECT
@@ -140,70 +151,24 @@ def _(
             FROM
                 clients_df
                 LEFT JOIN indexed_transactions_extracted_features ON indexed_transactions_extracted_features.index = clients_df.CLIENT_ID
+                LEFT JOIN indexed_app_activity_extracted_features ON indexed_app_activity_extracted_features.index = clients_df.CLIENT_ID
                 LEFT JOIN my_features ON my_features.CLIENT_ID = clients_df.CLIENT_ID
             """
         ).df()
-        return df_with_all_clients.fillna(train_transactions_extracted_features_medians)
+        return df_with_all_clients.fillna(train_transactions_extracted_features_medians).fillna(train_app_activity_extracted_features_medians)
     return (prepare_dataset,)
 
 
 @app.cell
 def _(
     prepare_dataset,
+    train_app_activity_extracted_features,
     train_clients,
     train_my_features,
     train_transactions_extracted_features,
 ):
-    train_df = prepare_dataset(train_clients, train_transactions_extracted_features, train_my_features)
+    train_df = prepare_dataset(train_clients, train_transactions_extracted_features, train_app_activity_extracted_features, train_my_features)
     return (train_df,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Генерація фіч
-    """)
-    return
-
-
-@app.cell
-def _(MinimalFCParameters, extract_features):
-    def extract_transactions_features(df):
-        return extract_features(df, column_id="CLIENT_ID", column_sort="TRAN_DATE", default_fc_parameters=MinimalFCParameters())
-    return (extract_transactions_features,)
-
-
-@app.cell
-def _(extract_transactions_features, train_transactions_numerified):
-    train_transactions_extracted_features = extract_transactions_features(train_transactions_numerified)
-    return (train_transactions_extracted_features,)
-
-
-@app.cell
-def _(df, duckdb):
-    def numerify_transactions(df):
-        return duckdb.sql(
-            f"""
-            SELECT
-                df.CLIENT_ID,
-                df.TRAN_DATE,
-                df.FLOAT_C16,
-                df.FLOAT_C17,
-                df.FLOAT_C18,
-                df.INT_C19,
-                df.FLOAT_C20,
-                df.FLOAT_C21
-            FROM
-                df
-            """
-        ).df()
-    return (numerify_transactions,)
-
-
-@app.cell
-def _(numerify_transactions, train_transactions):
-    train_transactions_numerified = numerify_transactions(train_transactions)
-    return (train_transactions_numerified,)
 
 
 @app.cell(hide_code=True)
@@ -308,6 +273,89 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Генерація фіч
+    """)
+    return
+
+
+@app.cell
+def _(df, duckdb):
+    def numerify_transactions(df):
+        return duckdb.sql(
+            f"""
+            SELECT
+                df.CLIENT_ID,
+                df.TRAN_DATE,
+                df.FLOAT_C16,
+                df.FLOAT_C17,
+                df.FLOAT_C18,
+                df.INT_C19,
+                df.FLOAT_C20,
+                df.FLOAT_C21
+            FROM
+                df
+            """
+        ).df()
+    return (numerify_transactions,)
+
+
+@app.cell
+def _(numerify_transactions, train_transactions):
+    train_transactions_numerified = numerify_transactions(train_transactions)
+    return (train_transactions_numerified,)
+
+
+@app.cell
+def _(MinimalFCParameters, extract_features):
+    def extract_transactions_features(df):
+        return extract_features(df, column_id="CLIENT_ID", column_sort="TRAN_DATE", default_fc_parameters=MinimalFCParameters())
+    return (extract_transactions_features,)
+
+
+@app.cell
+def _(extract_transactions_features, train_transactions_numerified):
+    train_transactions_extracted_features = extract_transactions_features(train_transactions_numerified)
+    return (train_transactions_extracted_features,)
+
+
+@app.cell
+def _(df, duckdb):
+    def numerify_app_activity(df):
+        return duckdb.sql(
+            f"""
+            SELECT
+                df.CLIENT_ID,
+                df.ACTIVITY_DATE,
+                df.DEVICE_ID
+            FROM
+            	df
+            """
+        ).df()
+    return (numerify_app_activity,)
+
+
+@app.cell
+def _(numerify_app_activity, train_app_activity):
+    train_app_activity_numerified = numerify_app_activity(train_app_activity)
+    return (train_app_activity_numerified,)
+
+
+@app.cell
+def _(MinimalFCParameters, extract_features):
+    def extract_app_activity_features(df):
+        return extract_features(df, column_id="CLIENT_ID", column_sort="ACTIVITY_DATE", default_fc_parameters=MinimalFCParameters())
+    return (extract_app_activity_features,)
+
+
+@app.cell
+def _(extract_app_activity_features, train_app_activity_numerified):
+    train_app_activity_extracted_features = extract_app_activity_features(train_app_activity_numerified)
+    return (train_app_activity_extracted_features,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## Data playground
     """)
     return
@@ -328,7 +376,7 @@ def _(mo, table_selector):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell(disabled=True, hide_code=True)
 def _(mo, table_selector):
     _df = mo.sql(
         f"""
