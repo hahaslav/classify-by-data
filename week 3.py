@@ -29,13 +29,13 @@ def _(feature_importance, features_list, plt, sns):
 
 
 @app.cell(hide_code=True)
-def _(mo, train_gini):
+def _(mo, train_gini, validate_gini):
     mo.md(rf"""
     ## Коефіцієнти Gini
 
     Тренувальна вибірка: {train_gini:.4f}
 
-    Валідаційна вибірка: {0:.4f}
+    Валідаційна вибірка: {validate_gini:.4f}
 
     {mo.accordion(
         {
@@ -65,34 +65,33 @@ def _(
     features_list,
     roc_auc_score,
     train_df,
+    validate_df,
 ):
     train_features = train_df[features_list]
     train_target = train_df['TARGET'].astype(int)
 
-    second_scaler = StandardScaler()
-    train_features_scaled = second_scaler.fit_transform(train_features)
+    scaler = StandardScaler()
+    train_features_scaled = scaler.fit_transform(train_features)
 
-    second_model = LogisticRegression(random_state=32, max_iter=1000, class_weight='balanced') # also try class_weight='balanced'
-    second_model.fit(train_features_scaled, train_target)
+    model = LogisticRegression(random_state=32, max_iter=1000, class_weight='balanced')
+    model.fit(train_features_scaled, train_target)
 
-    second_train_proba = second_model.predict_proba(train_features_scaled)[:, 1]
+    train_proba = model.predict_proba(train_features_scaled)[:, 1]
 
-    # features_test = test_df[features]
-    # target_test = test_df['TARGET'].astype(int)
-    # features_test_scaled = scaler.transform(features_test)
-    # target_pred = model.predict(features_test_scaled)
-    # target_proba = model.predict_proba(features_test_scaled)[:, 1]
+    validate_features = validate_df[features_list]
+    validate_target = validate_df['TARGET'].astype(int)
 
-    train_gini = gini(roc_auc_score(train_target, second_train_proba))
+    validate_features_scaled = scaler.transform(validate_features)
+    validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
 
-    # roc_auc_test = roc_auc_score(target_test, target_proba)
-    # gini_test = gini(roc_auc_test)
-    return second_model, train_gini
+    train_gini = gini(roc_auc_score(train_target, train_proba))
+    validate_gini = gini(roc_auc_score(validate_target, validate_proba))
+    return model, train_gini, validate_gini
 
 
 @app.cell(hide_code=True)
-def _(features_list, pd, second_model):
-    coefficients = second_model.coef_[0]
+def _(features_list, model, pd):
+    coefficients = model.coef_[0]
 
     feature_importance = pd.DataFrame({
         'Feature': features_list,
@@ -166,9 +165,14 @@ def _(
     train_clients,
     train_my_features,
     train_transactions_extracted_features,
+    validate_app_activity_extracted_features,
+    validate_clients,
+    validate_my_features,
+    validate_transactions_extracted_features,
 ):
     train_df = prepare_dataset(train_clients, train_transactions_extracted_features, train_app_activity_extracted_features, train_my_features)
-    return (train_df,)
+    validate_df = prepare_dataset(validate_clients, validate_transactions_extracted_features, validate_app_activity_extracted_features, validate_my_features)
+    return train_df, validate_df
 
 
 @app.cell(hide_code=True)
@@ -194,18 +198,6 @@ def _(clients_df, df, duckdb):
                 clients_df.CLIENT_ID;
             """).df()
     return (count_per_user,)
-
-
-@app.cell
-def _(
-    prepair_my_features,
-    train_app_activity,
-    train_clients,
-    train_communications,
-    train_transactions,
-):
-    train_my_features = prepair_my_features(train_app_activity, train_communications, train_transactions, train_clients)
-    return (train_my_features,)
 
 
 @app.cell
@@ -270,6 +262,23 @@ def _(
     return (prepair_my_features,)
 
 
+@app.cell
+def _(
+    prepair_my_features,
+    train_app_activity,
+    train_clients,
+    train_communications,
+    train_transactions,
+    validate_app_activity,
+    validate_clients,
+    validate_communications,
+    validate_transactions,
+):
+    train_my_features = prepair_my_features(train_app_activity, train_communications, train_transactions, train_clients)
+    validate_my_features = prepair_my_features(validate_app_activity, validate_communications, validate_transactions, validate_clients)
+    return train_my_features, validate_my_features
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -306,6 +315,12 @@ def _(numerify_transactions, train_transactions):
 
 
 @app.cell
+def _(numerify_transactions, validate_transactions):
+    validate_transactions_numerified = numerify_transactions(validate_transactions)
+    return (validate_transactions_numerified,)
+
+
+@app.cell
 def _(MinimalFCParameters, extract_features):
     def extract_transactions_features(df):
         return extract_features(df, column_id="CLIENT_ID", column_sort="TRAN_DATE", default_fc_parameters=MinimalFCParameters())
@@ -319,8 +334,15 @@ def _(extract_transactions_features, train_transactions_numerified):
 
 
 @app.cell
+def _(extract_transactions_features, validate_transactions_numerified):
+    validate_transactions_extracted_features = extract_transactions_features(validate_transactions_numerified)
+    return (validate_transactions_extracted_features,)
+
+
+@app.cell
 def _(df, duckdb):
     def numerify_app_activity(df):
+        df = df.copy()
         df.loc[:, "app_activity_CAT_C3_float"] = df["CAT_C3"].astype("float64").fillna(0)
         df.loc[:, "app_activity_CAT_C4_float"] = df["CAT_C4"].astype("float64").fillna(0)
         df.loc[:, "app_activity_CAT_C5_float"] = df["CAT_C5"].astype("float64").fillna(0)
@@ -349,6 +371,12 @@ def _(numerify_app_activity, train_app_activity):
 
 
 @app.cell
+def _(numerify_app_activity, validate_app_activity):
+    validate_app_activity_numerified = numerify_app_activity(validate_app_activity)
+    return (validate_app_activity_numerified,)
+
+
+@app.cell
 def _(MinimalFCParameters, extract_features):
     def extract_app_activity_features(df):
         return extract_features(df, column_id="CLIENT_ID", column_sort="ACTIVITY_DATE", default_fc_parameters=MinimalFCParameters())
@@ -359,6 +387,12 @@ def _(MinimalFCParameters, extract_features):
 def _(extract_app_activity_features, train_app_activity_numerified):
     train_app_activity_extracted_features = extract_app_activity_features(train_app_activity_numerified)
     return (train_app_activity_extracted_features,)
+
+
+@app.cell
+def _(extract_app_activity_features, validate_app_activity_numerified):
+    validate_app_activity_extracted_features = extract_app_activity_features(validate_app_activity_numerified)
+    return (validate_app_activity_extracted_features,)
 
 
 @app.cell(hide_code=True)
@@ -427,7 +461,7 @@ def _(clients_sample, mo):
 @app.cell
 def _(non_test_clients_df, train_test_split):
     train_clients, validate_clients = train_test_split(non_test_clients_df, test_size=0.25, random_state=32)
-    return (train_clients,)
+    return train_clients, validate_clients
 
 
 @app.function
@@ -436,11 +470,28 @@ def filter_dataset_by_clients(df, filter):
 
 
 @app.cell
-def _(app_activity, communications, train_clients, transactions):
+def _(
+    app_activity,
+    communications,
+    train_clients,
+    transactions,
+    validate_clients,
+):
     train_app_activity = filter_dataset_by_clients(app_activity, train_clients)
     train_communications = filter_dataset_by_clients(communications, train_clients)
     train_transactions = filter_dataset_by_clients(transactions, train_clients)
-    return train_app_activity, train_communications, train_transactions
+
+    validate_app_activity = filter_dataset_by_clients(app_activity, validate_clients)
+    validate_communications = filter_dataset_by_clients(communications, validate_clients)
+    validate_transactions = filter_dataset_by_clients(transactions, validate_clients)
+    return (
+        train_app_activity,
+        train_communications,
+        train_transactions,
+        validate_app_activity,
+        validate_communications,
+        validate_transactions,
+    )
 
 
 @app.cell(hide_code=True)
