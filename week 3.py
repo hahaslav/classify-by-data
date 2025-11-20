@@ -35,22 +35,6 @@ def _(feature_importance, plt, sns):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Формування фічей
-
-    - *count_app_activity_per_user*, *count_transactions_per_user*, *count_communications_per_user* - підрахунок кількості записів у кожній таблиці на користувача;
-    - *avg_transactions_FLOAT_C18* - середнє значення поля FLOAT_C18 із таблиці *transactions* для кожного користувача;
-    - *percent_count_transactions_INT_C19_eq_minus_1* - відсоток кількості значень '-1' серед кількості значень '-1' та '1' із поля INT_C19 із таблиці *transactions* для кожного користувача;
-    - *percent_communications_CAT_C4_eq_3*, *percent_app_activity_CAT_C6_eq_1*, *percent_app_activity_CAT_C9_eq_1* - відсоток кількості значень '3' із поля "CAT_C4" серед кількості рядків таблиці *communications* для кожного користувача. Аналогічно, кількість значень '1' із полей "CAT_C6" та "CAT_C9" серед кількості рядків таблиці *app_activity* для кожного користувача;
-    - *num_of_days_from_app_activity_min_ACTIVITY_DATE_to_2025_09_01* - кількість днів від найдавнішого запису користувача в таблиці *app_activity* до 1 вересня 2025 р. Якщо записів немає, то береться число 180.
-
-    Якщо не вказано інакше, то порожні записи у таблиці з фічами замінюються числом 0.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
     ## Data playground
     """)
     return
@@ -483,6 +467,142 @@ def _(target_pred, target_proba, test_df):
     return
 
 
+@app.cell
+def _(clients_sample, mo, transactions):
+    ts_df = mo.sql(
+        f"""
+        SELECT
+            clients_sample.CLIENT_ID,
+            transactions.TRAN_DATE,
+            transactions.FLOAT_C18,
+            transactions.FLOAT_C21
+        FROM
+            transactions
+            JOIN clients_sample ON transactions.CLIENT_ID = clients_sample.CLIENT_ID
+        WHERE
+            clients_sample.IS_TRAIN = 'true'
+        LIMIT
+            200000;
+        """,
+        output=False
+    )
+    return (ts_df,)
+
+
+@app.cell
+def _(extract_features, ts_df):
+    my_extracted_features = extract_features(ts_df, column_id="CLIENT_ID", column_sort="TRAN_DATE")
+    return (my_extracted_features,)
+
+
+@app.cell
+def _(my_extracted_features):
+    indexed_my_extracted_features = my_extracted_features.reset_index()
+    indexed_my_extracted_features
+    return (indexed_my_extracted_features,)
+
+
+@app.cell
+def _(clients_sample, indexed_my_extracted_features, mo):
+    fefe_df = mo.sql(
+        f"""
+        SELECT
+            *
+        FROM
+            indexed_my_extracted_features
+            JOIN clients_sample ON indexed_my_extracted_features.index = clients_sample.CLIENT_ID;
+        """
+    )
+    return (fefe_df,)
+
+
+@app.cell
+def _(fefe_df):
+    fefeatures = list(fefe_df.columns)
+    fefeatures.remove("index")
+    fefeatures.remove("COMMUNICATION_MONTH")
+    fefeatures.remove("IS_TRAIN")
+    fefeatures.remove("CLIENT_ID")
+    fefeatures.remove("FLOAT_C18__sample_entropy")
+    fefeatures.remove("FLOAT_C21__sample_entropy")
+    fefeatures.remove("FLOAT_C18__query_similarity_count__query_None__threshold_0.0")
+    fefeatures.remove("FLOAT_C21__query_similarity_count__query_None__threshold_0.0")
+    return (fefeatures,)
+
+
+@app.cell
+def _(fefe_df_filled):
+    import numpy as np
+    numeric_df = fefe_df_filled.select_dtypes(include=np.number)
+    is_inf_df = numeric_df.apply(np.isinf)
+    columns_with_inf = is_inf_df.any(axis=0)
+    columns_with_inf
+    return np, numeric_df
+
+
+@app.cell
+def _(np, numeric_df):
+    is_nan_df = numeric_df.apply(np.isnan)
+    columns_with_nan = is_nan_df.any(axis=0)
+    columns_with_nan
+    return
+
+
+@app.cell
+def _(fefe_df, fefeatures):
+    fefeatures_df = fefe_df[fefeatures]
+    column_medians = fefeatures_df.median()
+
+    fefe_df_filled = fefeatures_df.fillna(column_medians)
+    return (fefe_df_filled,)
+
+
+@app.cell
+def _(fefe_df, fefe_df_filled, train_test_split):
+    fetargets = fefe_df['TARGET'].astype(int)
+    train_fefeatures, test_fefeatures, train_fetarget, test_fetarget = train_test_split(fefe_df_filled, fetargets, test_size=0.3, random_state=32)
+    return test_fefeatures, test_fetarget, train_fefeatures, train_fetarget
+
+
+@app.cell
+def _(
+    LogisticRegression,
+    StandardScaler,
+    roc_auc_score,
+    test_fefeatures,
+    test_fetarget,
+    train_fefeatures,
+    train_fetarget,
+):
+    fescaler = StandardScaler()
+    fefeatures_train_scaled = fescaler.fit_transform(train_fefeatures)
+
+    femodel = LogisticRegression(random_state=32, class_weight='balanced')
+    femodel.fit(fefeatures_train_scaled, train_fetarget)
+
+    train_feproba = femodel.predict_proba(fefeatures_train_scaled)[:, 1]
+
+    fefeatures_test_scaled = fescaler.transform(test_fefeatures)
+    target_feproba = femodel.predict_proba(fefeatures_test_scaled)[:, 1]
+
+    roc_auc_fetrain = roc_auc_score(train_fetarget, train_feproba)
+    gini_fetrain = gini(roc_auc_fetrain)
+
+    roc_auc_fetest = roc_auc_score(test_fetarget, target_feproba)
+    gini_fetest = gini(roc_auc_fetest)
+    return gini_fetest, gini_fetrain
+
+
+@app.cell
+def _(gini_fetest, gini_fetrain, mo):
+    mo.md(rf"""
+    Тренувальна вибірка: {gini_fetrain:.4f}
+
+    Тестова вибірка: {gini_fetest:.4f}
+    """)
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -632,8 +752,16 @@ def _(mo):
 def _():
     from sklearn.preprocessing import StandardScaler
     from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import classification_report, roc_auc_score
-    return LogisticRegression, StandardScaler, roc_auc_score
+    from sklearn.metrics import roc_auc_score
+    from sklearn.model_selection import train_test_split
+    from tsfresh import extract_features
+    return (
+        LogisticRegression,
+        StandardScaler,
+        extract_features,
+        roc_auc_score,
+        train_test_split,
+    )
 
 
 @app.cell
