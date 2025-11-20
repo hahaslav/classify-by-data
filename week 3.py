@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.17.8"
+__generated_with = "0.18.0"
 app = marimo.App(width="medium")
 
 
@@ -73,7 +73,7 @@ def _(
     scaler = StandardScaler()
     train_features_scaled = scaler.fit_transform(train_features)
 
-    model = LogisticRegression(random_state=32, max_iter=1000, class_weight='balanced')
+    model = LogisticRegression(random_state=32, max_iter=250, class_weight='balanced')
     model.fit(train_features_scaled, train_target)
 
     train_proba = model.predict_proba(train_features_scaled)[:, 1]
@@ -347,6 +347,9 @@ def _(df, duckdb):
         df.loc[:, "app_activity_CAT_C4_float"] = df["CAT_C4"].astype("float64").fillna(0)
         df.loc[:, "app_activity_CAT_C5_float"] = df["CAT_C5"].astype("float64").fillna(0)
         df.loc[:, "app_activity_CAT_C6_float"] = df["CAT_C6"].astype("float64").fillna(0)
+        df.loc[:, "app_activity_CAT_C8_int"] = df["CAT_C8"].cat.codes
+        df.loc[:, "app_activity_CAT_C9_float"] = df["CAT_C9"].astype("float64").fillna(0)
+        df.loc[:, "app_activity_CAT_C10_int"] = df["CAT_C10"].cat.codes
         return duckdb.sql(
             f"""
             SELECT
@@ -356,7 +359,10 @@ def _(df, duckdb):
                 df.app_activity_CAT_C3_float,
                 df.app_activity_CAT_C4_float,
                 df.app_activity_CAT_C5_float,
-                df.app_activity_CAT_C6_float
+                df.app_activity_CAT_C6_float,
+                df.app_activity_CAT_C8_int,
+                df.app_activity_CAT_C9_float,
+                df.app_activity_CAT_C10_int
             FROM
             	df
             """
