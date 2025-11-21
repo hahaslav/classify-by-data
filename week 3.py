@@ -27,9 +27,9 @@ def _(features_list, mo, train_gini, validate_gini):
     mo.md(rf"""
     ## Коефіцієнти Gini
 
-    Тренувальна вибірка: {train_gini:.4f} (0.6233)
+    Тренувальна вибірка: {train_gini:.4f} (0.6587)
 
-    Валідаційна вибірка: {validate_gini:.4f} (0.5680)
+    Валідаційна вибірка: {validate_gini:.4f} (0.5703)
 
     Усього фіч: {len(features_list)}
     """)
@@ -368,11 +368,32 @@ def _(extract_communications_features, validate_communications_numerified):
 @app.cell
 def _(df, duckdb):
     def numerify_transactions(df):
+        df = df.copy()
+        df.loc[:, "transactions_CAT_C2_int"] = df["CAT_C2"].cat.codes
+        df.loc[:, "transactions_CAT_C3_int"] = df["CAT_C3"].cat.codes
+        df.loc[:, "transactions_CAT_C4_int"] = df["CAT_C4"].cat.codes
+        # df.loc[:, "transactions_FL_C6_int"] = df["FL_C6"].astype("int64")
+        # df.loc[:, "transactions_FL_C7_int"] = df["FL_C7"].astype("int64")
+        # df.loc[:, "transactions_FL_C8_int"] = df["FL_C8"].astype("int64")
+        # df.loc[:, "transactions_FL_C9_int"] = df["FL_C9"].astype("int64")
+        # df.loc[:, "transactions_FL_C10_int"] = df["FL_C10"].astype("int64")
+        # df.loc[:, "transactions_FL_C11_int"] = df["FL_C11"].astype("int64")
+        df.loc[:, "transactions_FL_C12_int"] = df["FL_C12"].astype("int64")
+        df.loc[:, "transactions_FL_C13_int"] = df["FL_C13"].astype("int64")
+        df.loc[:, "transactions_FL_C14_int"] = df["FL_C14"].astype("int64")
+        df.loc[:, "transactions_FL_C15_int"] = df["FL_C15"].astype("int64")
         return duckdb.sql(
             f"""
             SELECT
                 df.CLIENT_ID,
                 df.TRAN_DATE,
+                df.transactions_CAT_C2_int,
+                df.transactions_CAT_C3_int,
+                df.transactions_CAT_C4_int,
+                df.transactions_FL_C12_int,
+                df.transactions_FL_C13_int,
+                df.transactions_FL_C14_int,
+                df.transactions_FL_C15_int,
                 df.FLOAT_C16 as transactions_FLOAT_C16,
                 df.FLOAT_C17 as transactions_FLOAT_C17,
                 df.FLOAT_C18 as transactions_FLOAT_C18,
@@ -428,6 +449,13 @@ def _(df, duckdb):
         df.loc[:, "app_activity_CAT_C8_int"] = df["CAT_C8"].cat.codes
         df.loc[:, "app_activity_CAT_C9_float"] = df["CAT_C9"].astype("float64").fillna(0)
         df.loc[:, "app_activity_CAT_C10_int"] = df["CAT_C10"].cat.codes
+        df.loc[:, "app_activity_FLOAT_C11"] = df["FLOAT_C11"].fillna(0)
+        df.loc[:, "app_activity_FLOAT_C12"] = df["FLOAT_C12"].fillna(0)
+        # df.loc[:, "app_activity_FLOAT_C13"] = df["FLOAT_C13"].fillna(0)
+        df.loc[:, "app_activity_FLOAT_C14"] = df["FLOAT_C14"].fillna(0)
+        # df.loc[:, "app_activity_FLOAT_C15"] = df["FLOAT_C15"].fillna(0)
+        # df.loc[:, "app_activity_FLOAT_C16"] = df["FLOAT_C16"].fillna(0)
+        # df.loc[:, "app_activity_FLOAT_C17"] = df["FLOAT_C17"].fillna(0)
         return duckdb.sql(
             f"""
             SELECT
@@ -440,7 +468,10 @@ def _(df, duckdb):
                 df.app_activity_CAT_C6_float,
                 df.app_activity_CAT_C8_int,
                 df.app_activity_CAT_C9_float,
-                df.app_activity_CAT_C10_int
+                df.app_activity_CAT_C10_int,
+                df.app_activity_FLOAT_C11,
+                df.app_activity_FLOAT_C12,
+                df.app_activity_FLOAT_C14
             FROM
             	df
             """
