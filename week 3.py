@@ -16,7 +16,7 @@ def _(mo):
 def _(feature_importance, features_list, plt, sns):
     sns.set_style("whitegrid")
 
-    top_n_features = min(1000, len(features_list))
+    top_n_features = min(500, len(features_list))
 
     plt.rcParams["figure.dpi"] = 120
     plt.figure(figsize=(10, top_n_features / 4.5))
@@ -75,7 +75,7 @@ def _(
     scaler = StandardScaler()
     train_features_scaled = scaler.fit_transform(train_features)
 
-    model = LogisticRegression(random_state=32, max_iter=400, class_weight='balanced')
+    model = LogisticRegression(random_state=32, max_iter=1000, class_weight='balanced')
     model.fit(train_features_scaled, train_target)
 
     train_proba = model.predict_proba(train_features_scaled)[:, 1]
@@ -486,7 +486,18 @@ def _():
         "longest_strike_below_mean": None,
         "longest_strike_above_mean": None,
         "percentage_of_reoccurring_values_to_all_values": None,
-        "variance_larger_than_standard_deviation": None
+        "variance_larger_than_standard_deviation": None,
+        "linear_trend": [{"attr":"pvalue"},{"attr":"rvalue"},{"attr":"intercept"},{"attr":"slope"},{"attr":"stderr"}],
+        "number_peaks": [{"n":1},{"n":3},{"n":5},{"n":10},{"n":50}],
+        "ratio_beyond_r_sigma": [{"r":0.5},{"r":1},{"r":1.5},{"r":2},{"r":2.5},{"r":3},{"r":5},{"r":6},{"r":7},{"r":10}],
+        "last_location_of_maximum": None,
+        "first_location_of_maximum": None,
+        "last_location_of_minimum": None,
+        "first_location_of_minimum": None,
+        "abs_energy": None,
+        "mean_second_derivative_central": None,
+        "count_above": [{"t":0},{"t":1},{"t":2}],
+        "count_below": [{"t":0},{"t":1},{"t":2}]
     }
     return (myFCParameters,)
 
@@ -501,30 +512,34 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo, train_app_activity):
+    data_playground_switch = mo.ui.switch(label="Показати", value=False)
     train_app_activity
     table_selector = mo.ui.dropdown(["train_app_activity", "train_communications", "train_transactions"], value="train_app_activity", label="Таблиця")
-    return (table_selector,)
+    return data_playground_switch, table_selector
 
 
 @app.cell(hide_code=True)
-def _(mo, table_selector):
+def _(data_playground_switch, mo, table_selector):
     mo.md(rf"""
+    {data_playground_switch}
+
     {table_selector}
     """)
     return
 
 
-@app.cell(disabled=True, hide_code=True)
-def _(mo, table_selector):
-    _df = mo.sql(
-        f"""
-        SELECT
-            *
-        FROM
-            {table_selector.value}
-            JOIN clients_sample ON {table_selector.value}.CLIENT_ID = clients_sample.CLIENT_ID
-        """
-    )
+@app.cell(hide_code=True)
+def _(data_playground_switch, mo, table_selector):
+    if data_playground_switch.value:
+        _df = mo.sql(
+            f"""
+            SELECT
+                *
+            FROM
+                {table_selector.value}
+                JOIN clients_sample ON {table_selector.value}.CLIENT_ID = clients_sample.CLIENT_ID
+            """
+        )
     return
 
 
