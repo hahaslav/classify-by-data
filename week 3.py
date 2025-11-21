@@ -89,7 +89,7 @@ def _(features_list, model, roc_auc_score, scaler, test_df):
     test_proba = model.predict_proba(test_features_scaled)[:, 1]
 
     test_gini = gini(roc_auc_score(test_target, test_proba))
-    print(test_gini)
+    print(f"Тестова вибірка: {test_gini:.4f}")
     return
 
 
