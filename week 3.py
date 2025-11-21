@@ -31,18 +31,13 @@ def _(feature_importance, features_list, plt, sns):
 
 
 @app.cell(hide_code=True)
-def _(mo, test_gini, train_gini, validate_gini):
+def _(mo, train_gini, validate_gini):
     mo.md(rf"""
     ## Коефіцієнти Gini
 
     Тренувальна вибірка: {train_gini:.4f}
 
     Валідаційна вибірка: {validate_gini:.4f}
-
-    {mo.accordion(
-        {
-            "Тестова вибірка: ": mo.md(f"Поточна: {test_gini:.4f}\n\nМинула: 0.4921")}
-    )}
     """)
     return
 
@@ -66,7 +61,6 @@ def _(
     StandardScaler,
     features_list,
     roc_auc_score,
-    test_df,
     train_df,
     validate_df,
 ):
@@ -87,16 +81,22 @@ def _(
     validate_features_scaled = scaler.transform(validate_features)
     validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
 
+    train_gini = gini(roc_auc_score(train_target, train_proba))
+    validate_gini = gini(roc_auc_score(validate_target, validate_proba))
+    return model, scaler, train_gini, validate_gini
+
+
+@app.cell
+def _(features_list, model, roc_auc_score, scaler, test_df):
     test_features = test_df[features_list]
     test_target = test_df['TARGET'].astype(int)
 
     test_features_scaled = scaler.transform(test_features)
     test_proba = model.predict_proba(test_features_scaled)[:, 1]
 
-    train_gini = gini(roc_auc_score(train_target, train_proba))
-    validate_gini = gini(roc_auc_score(validate_target, validate_proba))
     test_gini = gini(roc_auc_score(test_target, test_proba))
-    return model, test_gini, train_gini, validate_gini
+    print(test_gini)
+    return
 
 
 @app.cell(hide_code=True)
@@ -178,11 +178,6 @@ def _(
 @app.cell
 def _(
     prepare_dataset,
-    test_app_activity_extracted_features,
-    test_clients,
-    test_communications_extracted_features,
-    test_my_features,
-    test_transactions_extracted_features,
     train_app_activity_extracted_features,
     train_clients,
     train_communications_extracted_features,
@@ -196,8 +191,20 @@ def _(
 ):
     train_df = prepare_dataset(train_clients, train_transactions_extracted_features, train_app_activity_extracted_features, train_communications_extracted_features, train_my_features)
     validate_df = prepare_dataset(validate_clients, validate_transactions_extracted_features, validate_app_activity_extracted_features, validate_communications_extracted_features, validate_my_features)
+    return train_df, validate_df
+
+
+@app.cell
+def _(
+    prepare_dataset,
+    test_app_activity_extracted_features,
+    test_clients,
+    test_communications_extracted_features,
+    test_my_features,
+    test_transactions_extracted_features,
+):
     test_df = prepare_dataset(test_clients, test_transactions_extracted_features, test_app_activity_extracted_features, test_communications_extracted_features, test_my_features)
-    return test_df, train_df, validate_df
+    return (test_df,)
 
 
 @app.cell(hide_code=True)
@@ -290,10 +297,6 @@ def _(
 @app.cell
 def _(
     prepair_my_features,
-    test_app_activity,
-    test_clients,
-    test_communications,
-    test_transactions,
     train_app_activity,
     train_clients,
     train_communications,
@@ -305,8 +308,19 @@ def _(
 ):
     train_my_features = prepair_my_features(train_app_activity, train_communications, train_transactions, train_clients)
     validate_my_features = prepair_my_features(validate_app_activity, validate_communications, validate_transactions, validate_clients)
+    return train_my_features, validate_my_features
+
+
+@app.cell
+def _(
+    prepair_my_features,
+    test_app_activity,
+    test_clients,
+    test_communications,
+    test_transactions,
+):
     test_my_features = prepair_my_features(test_app_activity, test_communications, test_transactions, test_clients)
-    return test_my_features, train_my_features, validate_my_features
+    return (test_my_features,)
 
 
 @app.cell(hide_code=True)
@@ -541,18 +555,7 @@ def _():
         "longest_strike_below_mean": None,
         "longest_strike_above_mean": None,
         "percentage_of_reoccurring_values_to_all_values": None,
-        "variance_larger_than_standard_deviation": None,
-        "linear_trend": [{"attr":"pvalue"},{"attr":"rvalue"},{"attr":"intercept"},{"attr":"slope"},{"attr":"stderr"}],
-        "number_peaks": [{"n":1},{"n":3},{"n":5},{"n":10},{"n":50}],
-        "ratio_beyond_r_sigma": [{"r":0.5},{"r":1},{"r":1.5},{"r":2},{"r":2.5},{"r":3},{"r":5},{"r":6},{"r":7},{"r":10}],
-        "last_location_of_maximum": None,
-        "first_location_of_maximum": None,
-        "last_location_of_minimum": None,
-        "first_location_of_minimum": None,
-        "abs_energy": None,
-        "mean_second_derivative_central": None,
-        "count_above": [{"t":0},{"t":1},{"t":2}],
-        "count_below": [{"t":0},{"t":1},{"t":2}]
+        "variance_larger_than_standard_deviation": None
     }
     return (myFCParameters,)
 
@@ -655,7 +658,7 @@ def _(app_activity, communications, transactions, validate_clients):
     )
 
 
-@app.cell
+@app.cell(disabled=True)
 def _(clients_sample, mo):
     test_clients = mo.sql(
         f"""
@@ -667,7 +670,8 @@ def _(clients_sample, mo):
             clients_sample
         WHERE
             clients_sample.IS_TRAIN = FALSE
-        """
+        """,
+        output=False
     )
     return (test_clients,)
 
