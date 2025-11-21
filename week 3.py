@@ -35,9 +35,9 @@ def _(mo, train_gini, validate_gini):
     mo.md(rf"""
     ## Коефіцієнти Gini
 
-    Тренувальна вибірка: {train_gini:.4f}
+    Тренувальна вибірка: {train_gini:.4f} (0.6157)
 
-    Валідаційна вибірка: {validate_gini:.4f}
+    Валідаційна вибірка: {validate_gini:.4f} (0.5622)
     """)
     return
 
@@ -332,6 +332,42 @@ def _(mo):
 
 
 @app.cell
+def _(extract_transactions_features, train_transactions_numerified):
+    train_transactions_extracted_features = extract_transactions_features(train_transactions_numerified)
+    return (train_transactions_extracted_features,)
+
+
+@app.cell
+def _(extract_transactions_features, validate_transactions_numerified):
+    validate_transactions_extracted_features = extract_transactions_features(validate_transactions_numerified)
+    return (validate_transactions_extracted_features,)
+
+
+@app.cell
+def _(extract_app_activity_features, train_app_activity_numerified):
+    train_app_activity_extracted_features = extract_app_activity_features(train_app_activity_numerified)
+    return (train_app_activity_extracted_features,)
+
+
+@app.cell
+def _(extract_app_activity_features, validate_app_activity_numerified):
+    validate_app_activity_extracted_features = extract_app_activity_features(validate_app_activity_numerified)
+    return (validate_app_activity_extracted_features,)
+
+
+@app.cell
+def _(extract_communications_features, train_communications_numerified):
+    train_communications_extracted_features = extract_communications_features(train_communications_numerified)
+    return (train_communications_extracted_features,)
+
+
+@app.cell
+def _(extract_communications_features, validate_communications_numerified):
+    validate_communications_extracted_features = extract_communications_features(validate_communications_numerified)
+    return (validate_communications_extracted_features,)
+
+
+@app.cell
 def _(df, duckdb):
     def numerify_transactions(df):
         return duckdb.sql(
@@ -375,18 +411,6 @@ def _(extract_features, myFCParameters):
     def extract_transactions_features(df):
         return extract_features(df, column_id="CLIENT_ID", column_sort="TRAN_DATE", default_fc_parameters=myFCParameters)
     return (extract_transactions_features,)
-
-
-@app.cell
-def _(extract_transactions_features, train_transactions_numerified):
-    train_transactions_extracted_features = extract_transactions_features(train_transactions_numerified)
-    return (train_transactions_extracted_features,)
-
-
-@app.cell
-def _(extract_transactions_features, validate_transactions_numerified):
-    validate_transactions_extracted_features = extract_transactions_features(validate_transactions_numerified)
-    return (validate_transactions_extracted_features,)
 
 
 @app.cell
@@ -452,18 +476,6 @@ def _(extract_features, myFCParameters):
 
 
 @app.cell
-def _(extract_app_activity_features, train_app_activity_numerified):
-    train_app_activity_extracted_features = extract_app_activity_features(train_app_activity_numerified)
-    return (train_app_activity_extracted_features,)
-
-
-@app.cell
-def _(extract_app_activity_features, validate_app_activity_numerified):
-    validate_app_activity_extracted_features = extract_app_activity_features(validate_app_activity_numerified)
-    return (validate_app_activity_extracted_features,)
-
-
-@app.cell
 def _(extract_app_activity_features, test_app_activity_numerified):
     test_app_activity_extracted_features = extract_app_activity_features(test_app_activity_numerified)
     return (test_app_activity_extracted_features,)
@@ -473,15 +485,19 @@ def _(extract_app_activity_features, test_app_activity_numerified):
 def _(df, duckdb):
     def numerify_communications(df):
         df = df.copy()
+        df.loc[:, "communications_CAT_C2_int"] = df["CAT_C2"].cat.codes
         df.loc[:, "communications_CAT_C3_float"] = df["CAT_C3"].astype("float64").fillna(0)
         df.loc[:, "communications_CAT_C4_float"] = df["CAT_C4"].astype("float64").fillna(0)
+        df.loc[:, "communications_CAT_C5_int"] = df["CAT_C5"].cat.codes
         return duckdb.sql(
             f"""
             SELECT
                 df.CLIENT_ID,
                 df.CONTACT_DATE,
+                df.communications_CAT_C2_int,
                 df.communications_CAT_C3_float,
-                df.communications_CAT_C4_float
+                df.communications_CAT_C4_float,
+                df.communications_CAT_C5_int
             FROM
             	df
             """
@@ -512,18 +528,6 @@ def _(extract_features, myFCParameters):
     def extract_communications_features(df):
         return extract_features(df, column_id="CLIENT_ID", column_sort="CONTACT_DATE", default_fc_parameters=myFCParameters)
     return (extract_communications_features,)
-
-
-@app.cell
-def _(extract_communications_features, train_communications_numerified):
-    train_communications_extracted_features = extract_communications_features(train_communications_numerified)
-    return (train_communications_extracted_features,)
-
-
-@app.cell
-def _(extract_communications_features, validate_communications_numerified):
-    validate_communications_extracted_features = extract_communications_features(validate_communications_numerified)
-    return (validate_communications_extracted_features,)
 
 
 @app.cell
