@@ -1,15 +1,7 @@
 import marimo
 
 __generated_with = "0.18.0"
-app = marimo.App(width="medium")
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Feature importance
-    """)
-    return
+app = marimo.App(width="full")
 
 
 @app.cell(hide_code=True)
@@ -31,13 +23,15 @@ def _(feature_importance, features_list, plt, sns):
 
 
 @app.cell(hide_code=True)
-def _(mo, train_gini, validate_gini):
+def _(features_list, mo, train_gini, validate_gini):
     mo.md(rf"""
     ## Коефіцієнти Gini
 
-    Тренувальна вибірка: {train_gini:.4f} (0.6157)
+    Тренувальна вибірка: {train_gini:.4f} (0.6233)
 
-    Валідаційна вибірка: {validate_gini:.4f} (0.5622)
+    Валідаційна вибірка: {validate_gini:.4f} (0.5680)
+
+    Усього фіч: {len(features_list)}
     """)
     return
 
@@ -131,7 +125,7 @@ def _(
     train_communications_extracted_features,
     train_transactions_extracted_features,
 ):
-    features_list = list(train_transactions_extracted_features.columns) + list(train_app_activity_extracted_features.columns) + list(train_communications_extracted_features.columns) + ["count_app_activity_per_user", "count_communications_per_user", "count_transactions_per_user", "days_old_ACTIVITY_DATE"]
+    features_list = list(train_transactions_extracted_features.columns) + list(train_app_activity_extracted_features.columns) + list(train_communications_extracted_features.columns) + ["count_app_activity_per_user", "count_communications_per_user", "count_transactions_per_user", "days_old_ACTIVITY_DATE", "days_old_COMMUNICATION_MONTH"]
     train_transactions_extracted_features_medians = train_transactions_extracted_features.median()
     train_app_activity_extracted_features_medians = train_app_activity_extracted_features.median()
     train_communications_extracted_features_medians = train_communications_extracted_features.median()
@@ -269,17 +263,21 @@ def _(
             SELECT
                 clients_df.CLIENT_ID,
                 days_old_ACTIVITY_DATE.int as 'days_old_ACTIVITY_DATE',
+                clients_df.COMMUNICATION_MONTH
             FROM
                 clients_df
                 LEFT JOIN days_old_ACTIVITY_DATE ON days_old_ACTIVITY_DATE.CLIENT_ID = clients_df.CLIENT_ID
             """
         ).df()
         df_with_all_clients_days_fillna = df_with_all_clients_days.fillna(180)
+        df_with_all_clients_days_fillna["month_diff"] = target_date - pd.to_datetime(df_with_all_clients_days_fillna["COMMUNICATION_MONTH"])
+        df_with_all_clients_days_fillna['int'] = df_with_all_clients_days_fillna['month_diff'].dt.days
         df_with_all_clients = duckdb.sql(
             """
             SELECT
                 df_with_all_clients_days_fillna.CLIENT_ID,
                 df_with_all_clients_days_fillna.days_old_ACTIVITY_DATE,
+                df_with_all_clients_days_fillna.int as 'days_old_COMMUNICATION_MONTH',
                 count_app_activity_per_user.count as 'count_app_activity_per_user',
                 count_communications_per_user.count as 'count_communications_per_user',
                 count_transactions_per_user.count as 'count_transactions_per_user'
