@@ -31,7 +31,7 @@ def _(feature_importance, features_list, plt, sns):
 
 
 @app.cell(hide_code=True)
-def _(mo, train_gini, validate_gini):
+def _(mo, test_gini, train_gini, validate_gini):
     mo.md(rf"""
     ## Коефіцієнти Gini
 
@@ -41,7 +41,7 @@ def _(mo, train_gini, validate_gini):
 
     {mo.accordion(
         {
-            "Тестова вибірка: ": mo.md(f"Поточна: {0:.4f}\n\nМинула: 0.4921")}
+            "Тестова вибірка: ": mo.md(f"Поточна: {test_gini:.4f}\n\nМинула: 0.4921")}
     )}
     """)
     return
@@ -66,6 +66,7 @@ def _(
     StandardScaler,
     features_list,
     roc_auc_score,
+    test_df,
     train_df,
     validate_df,
 ):
@@ -86,9 +87,16 @@ def _(
     validate_features_scaled = scaler.transform(validate_features)
     validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
 
+    test_features = test_df[features_list]
+    test_target = test_df['TARGET'].astype(int)
+
+    test_features_scaled = scaler.transform(test_features)
+    test_proba = model.predict_proba(test_features_scaled)[:, 1]
+
     train_gini = gini(roc_auc_score(train_target, train_proba))
     validate_gini = gini(roc_auc_score(validate_target, validate_proba))
-    return model, train_gini, validate_gini
+    test_gini = gini(roc_auc_score(test_target, test_proba))
+    return model, test_gini, train_gini, validate_gini
 
 
 @app.cell(hide_code=True)
@@ -170,6 +178,11 @@ def _(
 @app.cell
 def _(
     prepare_dataset,
+    test_app_activity_extracted_features,
+    test_clients,
+    test_communications_extracted_features,
+    test_my_features,
+    test_transactions_extracted_features,
     train_app_activity_extracted_features,
     train_clients,
     train_communications_extracted_features,
@@ -183,7 +196,8 @@ def _(
 ):
     train_df = prepare_dataset(train_clients, train_transactions_extracted_features, train_app_activity_extracted_features, train_communications_extracted_features, train_my_features)
     validate_df = prepare_dataset(validate_clients, validate_transactions_extracted_features, validate_app_activity_extracted_features, validate_communications_extracted_features, validate_my_features)
-    return train_df, validate_df
+    test_df = prepare_dataset(test_clients, test_transactions_extracted_features, test_app_activity_extracted_features, test_communications_extracted_features, test_my_features)
+    return test_df, train_df, validate_df
 
 
 @app.cell(hide_code=True)
@@ -276,6 +290,10 @@ def _(
 @app.cell
 def _(
     prepair_my_features,
+    test_app_activity,
+    test_clients,
+    test_communications,
+    test_transactions,
     train_app_activity,
     train_clients,
     train_communications,
@@ -287,7 +305,8 @@ def _(
 ):
     train_my_features = prepair_my_features(train_app_activity, train_communications, train_transactions, train_clients)
     validate_my_features = prepair_my_features(validate_app_activity, validate_communications, validate_transactions, validate_clients)
-    return train_my_features, validate_my_features
+    test_my_features = prepair_my_features(test_app_activity, test_communications, test_transactions, test_clients)
+    return test_my_features, train_my_features, validate_my_features
 
 
 @app.cell(hide_code=True)
@@ -332,6 +351,12 @@ def _(numerify_transactions, validate_transactions):
 
 
 @app.cell
+def _(numerify_transactions, test_transactions):
+    test_transactions_numerified = numerify_transactions(test_transactions)
+    return (test_transactions_numerified,)
+
+
+@app.cell
 def _(extract_features, myFCParameters):
     def extract_transactions_features(df):
         return extract_features(df, column_id="CLIENT_ID", column_sort="TRAN_DATE", default_fc_parameters=myFCParameters)
@@ -348,6 +373,12 @@ def _(extract_transactions_features, train_transactions_numerified):
 def _(extract_transactions_features, validate_transactions_numerified):
     validate_transactions_extracted_features = extract_transactions_features(validate_transactions_numerified)
     return (validate_transactions_extracted_features,)
+
+
+@app.cell
+def _(extract_transactions_features, test_transactions_numerified):
+    test_transactions_extracted_features = extract_transactions_features(test_transactions_numerified)
+    return (test_transactions_extracted_features,)
 
 
 @app.cell
@@ -394,6 +425,12 @@ def _(numerify_app_activity, validate_app_activity):
 
 
 @app.cell
+def _(numerify_app_activity, test_app_activity):
+    test_app_activity_numerified = numerify_app_activity(test_app_activity)
+    return (test_app_activity_numerified,)
+
+
+@app.cell
 def _(extract_features, myFCParameters):
     def extract_app_activity_features(df):
         return extract_features(df, column_id="CLIENT_ID", column_sort="ACTIVITY_DATE", default_fc_parameters=myFCParameters)
@@ -410,6 +447,12 @@ def _(extract_app_activity_features, train_app_activity_numerified):
 def _(extract_app_activity_features, validate_app_activity_numerified):
     validate_app_activity_extracted_features = extract_app_activity_features(validate_app_activity_numerified)
     return (validate_app_activity_extracted_features,)
+
+
+@app.cell
+def _(extract_app_activity_features, test_app_activity_numerified):
+    test_app_activity_extracted_features = extract_app_activity_features(test_app_activity_numerified)
+    return (test_app_activity_extracted_features,)
 
 
 @app.cell
@@ -445,6 +488,12 @@ def _(numerify_communications, validate_communications):
 
 
 @app.cell
+def _(numerify_communications, test_communications):
+    test_communications_numerified = numerify_communications(test_communications)
+    return (test_communications_numerified,)
+
+
+@app.cell
 def _(extract_features, myFCParameters):
     def extract_communications_features(df):
         return extract_features(df, column_id="CLIENT_ID", column_sort="CONTACT_DATE", default_fc_parameters=myFCParameters)
@@ -461,6 +510,12 @@ def _(extract_communications_features, train_communications_numerified):
 def _(extract_communications_features, validate_communications_numerified):
     validate_communications_extracted_features = extract_communications_features(validate_communications_numerified)
     return (validate_communications_extracted_features,)
+
+
+@app.cell
+def _(extract_communications_features, test_communications_numerified):
+    test_communications_extracted_features = extract_communications_features(test_communications_numerified)
+    return (test_communications_extracted_features,)
 
 
 @app.cell
@@ -581,28 +636,48 @@ def filter_dataset_by_clients(df, filter):
 
 
 @app.cell
-def _(
-    app_activity,
-    communications,
-    train_clients,
-    transactions,
-    validate_clients,
-):
+def _(app_activity, communications, train_clients, transactions):
     train_app_activity = filter_dataset_by_clients(app_activity, train_clients)
     train_communications = filter_dataset_by_clients(communications, train_clients)
     train_transactions = filter_dataset_by_clients(transactions, train_clients)
+    return train_app_activity, train_communications, train_transactions
 
+
+@app.cell
+def _(app_activity, communications, transactions, validate_clients):
     validate_app_activity = filter_dataset_by_clients(app_activity, validate_clients)
     validate_communications = filter_dataset_by_clients(communications, validate_clients)
     validate_transactions = filter_dataset_by_clients(transactions, validate_clients)
     return (
-        train_app_activity,
-        train_communications,
-        train_transactions,
         validate_app_activity,
         validate_communications,
         validate_transactions,
     )
+
+
+@app.cell
+def _(clients_sample, mo):
+    test_clients = mo.sql(
+        f"""
+        SELECT
+            clients_sample.CLIENT_ID,
+            clients_sample.TARGET,
+            clients_sample.COMMUNICATION_MONTH
+        FROM
+            clients_sample
+        WHERE
+            clients_sample.IS_TRAIN = FALSE
+        """
+    )
+    return (test_clients,)
+
+
+@app.cell
+def _(app_activity, communications, test_clients, transactions):
+    test_app_activity = filter_dataset_by_clients(app_activity, test_clients)
+    test_communications = filter_dataset_by_clients(communications, test_clients)
+    test_transactions = filter_dataset_by_clients(transactions, test_clients)
+    return test_app_activity, test_communications, test_transactions
 
 
 @app.cell(hide_code=True)
