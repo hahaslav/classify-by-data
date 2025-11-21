@@ -16,10 +16,12 @@ def _(mo):
 def _(feature_importance, features_list, plt, sns):
     sns.set_style("whitegrid")
 
-    plt.rcParams["figure.dpi"] = 160
-    plt.figure(figsize=(10, len(features_list) / 4.5))
+    top_n_features = min(1000, len(features_list))
 
-    sns.barplot(x='Coefficient', y='Feature', data=feature_importance)
+    plt.rcParams["figure.dpi"] = 120
+    plt.figure(figsize=(10, top_n_features / 4.5))
+
+    sns.barplot(x='Coefficient', y='Feature', data=feature_importance.head(top_n_features))
 
     plt.title('Feature Importance')
     plt.xlabel('Coefficient Value')
@@ -73,7 +75,7 @@ def _(
     scaler = StandardScaler()
     train_features_scaled = scaler.fit_transform(train_features)
 
-    model = LogisticRegression(random_state=32, max_iter=250, class_weight='balanced')
+    model = LogisticRegression(random_state=32, max_iter=400, class_weight='balanced')
     model.fit(train_features_scaled, train_target)
 
     train_proba = model.predict_proba(train_features_scaled)[:, 1]
@@ -330,9 +332,9 @@ def _(numerify_transactions, validate_transactions):
 
 
 @app.cell
-def _(MinimalFCParameters, extract_features):
+def _(extract_features, myFCParameters):
     def extract_transactions_features(df):
-        return extract_features(df, column_id="CLIENT_ID", column_sort="TRAN_DATE", default_fc_parameters=MinimalFCParameters())
+        return extract_features(df, column_id="CLIENT_ID", column_sort="TRAN_DATE", default_fc_parameters=myFCParameters)
     return (extract_transactions_features,)
 
 
@@ -392,9 +394,9 @@ def _(numerify_app_activity, validate_app_activity):
 
 
 @app.cell
-def _(MinimalFCParameters, extract_features):
+def _(extract_features, myFCParameters):
     def extract_app_activity_features(df):
-        return extract_features(df, column_id="CLIENT_ID", column_sort="ACTIVITY_DATE", default_fc_parameters=MinimalFCParameters())
+        return extract_features(df, column_id="CLIENT_ID", column_sort="ACTIVITY_DATE", default_fc_parameters=myFCParameters)
     return (extract_app_activity_features,)
 
 
@@ -443,9 +445,9 @@ def _(numerify_communications, validate_communications):
 
 
 @app.cell
-def _(MinimalFCParameters, extract_features):
+def _(extract_features, myFCParameters):
     def extract_communications_features(df):
-        return extract_features(df, column_id="CLIENT_ID", column_sort="CONTACT_DATE", default_fc_parameters=MinimalFCParameters())
+        return extract_features(df, column_id="CLIENT_ID", column_sort="CONTACT_DATE", default_fc_parameters=myFCParameters)
     return (extract_communications_features,)
 
 
@@ -459,6 +461,34 @@ def _(extract_communications_features, train_communications_numerified):
 def _(extract_communications_features, validate_communications_numerified):
     validate_communications_extracted_features = extract_communications_features(validate_communications_numerified)
     return (validate_communications_extracted_features,)
+
+
+@app.cell
+def _():
+    myFCParameters = {
+        "sum_values": None,
+        "median": None,
+        "mean": None,
+        "length": None,
+        "standard_deviation": None,
+        "variance": None,
+        "root_mean_square": None,
+        "maximum": None,
+        "absolute_maximum": None,
+        "minimum": None,
+        "skewness": None,
+        "kurtosis": None,
+        "mean_change": None,
+        "mean_abs_change": None,
+        "quantile": [{"q":0.1},{"q":0.2},{"q":0.3},{"q":0.4},{"q":0.6},{"q":0.7},{"q":0.8},{"q":0.9}],
+        "count_above_mean": None,
+        "count_below_mean": None,
+        "longest_strike_below_mean": None,
+        "longest_strike_above_mean": None,
+        "percentage_of_reoccurring_values_to_all_values": None,
+        "variance_larger_than_standard_deviation": None
+    }
+    return (myFCParameters,)
 
 
 @app.cell(hide_code=True)
@@ -484,7 +514,7 @@ def _(mo, table_selector):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell(disabled=True, hide_code=True)
 def _(mo, table_selector):
     _df = mo.sql(
         f"""
@@ -686,10 +716,8 @@ def _():
     from sklearn.metrics import roc_auc_score
     from sklearn.model_selection import train_test_split
     from tsfresh import extract_features
-    from tsfresh.feature_extraction import MinimalFCParameters
     return (
         LogisticRegression,
-        MinimalFCParameters,
         StandardScaler,
         extract_features,
         roc_auc_score,
