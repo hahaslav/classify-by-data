@@ -347,10 +347,14 @@ def _(mo, recalculate_extracted_features_switch):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     recalculate_extracted_features_switch = mo.ui.switch(label="Recalculate extracted features", value=False)
-    return (recalculate_extracted_features_switch,)
+    test_recalculate_extracted_features_switch = mo.ui.switch(label="Recalculate extracted features for test", value=False)
+    return (
+        recalculate_extracted_features_switch,
+        test_recalculate_extracted_features_switch,
+    )
 
 
 @app.cell
@@ -510,9 +514,26 @@ def _(extract_features, myFCParameters):
     return (extract_transactions_features,)
 
 
+@app.cell(hide_code=True)
+def _(mo, test_recalculate_extracted_features_switch):
+    mo.md(rf"""
+    {test_recalculate_extracted_features_switch}
+    """)
+    return
+
+
 @app.cell
-def _(extract_transactions_features, test_transactions_numerified):
-    test_transactions_extracted_features = extract_transactions_features(test_transactions_numerified)
+def _(
+    extract_transactions_features,
+    pd,
+    test_recalculate_extracted_features_switch,
+    test_transactions_numerified,
+):
+    if test_recalculate_extracted_features_switch.value:
+        test_transactions_extracted_features = extract_transactions_features(test_transactions_numerified)
+        test_transactions_extracted_features.to_pickle("test_transactions_extracted_features.pkl")
+    else:
+        test_transactions_extracted_features = pd.read_pickle("test_transactions_extracted_features.pkl")
     return (test_transactions_extracted_features,)
 
 
@@ -583,8 +604,17 @@ def _(extract_features, myFCParameters):
 
 
 @app.cell
-def _(extract_app_activity_features, test_app_activity_numerified):
-    test_app_activity_extracted_features = extract_app_activity_features(test_app_activity_numerified)
+def _(
+    extract_app_activity_features,
+    pd,
+    test_app_activity_numerified,
+    test_recalculate_extracted_features_switch,
+):
+    if test_recalculate_extracted_features_switch.value:
+        test_app_activity_extracted_features = extract_app_activity_features(test_app_activity_numerified)
+        test_app_activity_extracted_features.to_pickle("test_app_activity_extracted_features.pkl")
+    else:
+        test_app_activity_extracted_features = pd.read_pickle("test_app_activity_extracted_features.pkl")
     return (test_app_activity_extracted_features,)
 
 
@@ -638,8 +668,17 @@ def _(extract_features, myFCParameters):
 
 
 @app.cell
-def _(extract_communications_features, test_communications_numerified):
-    test_communications_extracted_features = extract_communications_features(test_communications_numerified)
+def _(
+    extract_communications_features,
+    pd,
+    test_communications_numerified,
+    test_recalculate_extracted_features_switch,
+):
+    if test_recalculate_extracted_features_switch.value:
+        test_communications_extracted_features = extract_communications_features(test_communications_numerified)
+        test_communications_extracted_features.to_pickle("test_communications_extracted_features.pkl")
+    else:
+        test_communications_extracted_features = pd.read_pickle("test_communications_extracted_features.pkl")
     return (test_communications_extracted_features,)
 
 
