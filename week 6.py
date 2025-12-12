@@ -104,6 +104,17 @@ def _(model, pd):
     return (feature_importance,)
 
 
+@app.cell
+def _(features_list, model, pd):
+    importance_df = pd.DataFrame({
+        'Feature': features_list,
+        'Importance': model.feature_importances_
+    })
+
+    importance_df[importance_df['Importance'] == 0]
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -118,33 +129,37 @@ def _(VarianceThreshold, features_list_full, train_full):
 
     variance_filter = VarianceThreshold(threshold=0.1)
     variance_df = variance_filter.fit_transform(full_df)
-    return (variance_df,)
+    return
 
 
 @app.cell
-def _(variance_df):
-    features_list = variance_df.columns
+def _(features_list_full):
+    # features_list = variance_df.columns
+    features_list = features_list_full
     return (features_list,)
 
 
 @app.cell
-def _(train_full, variance_df):
-    train_df = variance_df.copy()
-    train_df["TARGET"] = train_full["TARGET"]
+def _(train_full):
+    # train_df = variance_df.copy()
+    # train_df["TARGET"] = train_full["TARGET"]
+    train_df = train_full
     return (train_df,)
 
 
 @app.cell
-def _(features_list, validate_full):
-    validate_df = validate_full[features_list].copy()
-    validate_df["TARGET"] = validate_full["TARGET"]
+def _(validate_full):
+    # validate_df = validate_full[features_list].copy()
+    # validate_df["TARGET"] = validate_full["TARGET"]
+    validate_df = validate_full
     return (validate_df,)
 
 
 @app.cell
-def _(features_list, test_full):
-    test_df = test_full[features_list].copy()
-    test_df["TARGET"] = test_full["TARGET"]
+def _(test_full):
+    # test_df = test_full[features_list].copy()
+    # test_df["TARGET"] = test_full["TARGET"]
+    test_df = test_full
     return (test_df,)
 
 
