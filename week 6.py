@@ -29,7 +29,7 @@ def _(features_list, mo, train_gini, validate_gini):
 
     Тренувальна вибірка: {train_gini:.4f} (0.6587) (0.9998)
 
-    Валідаційна вибірка: {validate_gini:.4f} (0.5703) (0.5634)
+    Валідаційна вибірка: {validate_gini:.4f} (0.5703) (0.5706)
 
     Усього фіч: {len(features_list)}
     """)
@@ -94,13 +94,11 @@ def _(features_list, model, roc_auc_score, scaler, test_df):
 
 
 @app.cell(hide_code=True)
-def _(features_list, model, pd):
+def _(model, pd):
     importance_dict = model.get_booster().get_score(importance_type='gain')
-    feature_map = {f'f{i}': name for i, name in enumerate(features_list)}
-    mapped_importance = {feature_map[k]: v for k, v in importance_dict.items() if k in feature_map}
 
     feature_importance = pd.DataFrame(
-        list(mapped_importance.items()), 
+        list(importance_dict.items()),
         columns=['Feature', 'Importance Score']
     ).sort_values(by='Importance Score', ascending=False)
     return (feature_importance,)
@@ -109,34 +107,78 @@ def _(features_list, model, pd):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Підготовка згенерованих датасетів до тренування
+    ## Очищення датасетів
+    """)
+    return
+
+
+@app.cell
+def _(VarianceThreshold, features_list_full, train_full):
+    full_df = train_full[features_list_full]
+
+    variance_filter = VarianceThreshold(threshold=0.1)
+    variance_df = variance_filter.fit_transform(full_df)
+    return (variance_df,)
+
+
+@app.cell
+def _(variance_df):
+    features_list = variance_df.columns
+    return (features_list,)
+
+
+@app.cell
+def _(train_full, variance_df):
+    train_df = variance_df.copy()
+    train_df["TARGET"] = train_full["TARGET"]
+    return (train_df,)
+
+
+@app.cell
+def _(features_list, validate_full):
+    validate_df = validate_full[features_list].copy()
+    validate_df["TARGET"] = validate_full["TARGET"]
+    return (validate_df,)
+
+
+@app.cell
+def _(features_list, test_full):
+    test_df = test_full[features_list].copy()
+    test_df["TARGET"] = test_full["TARGET"]
+    return (test_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Завантаження згенерованих датасетів
     """)
     return
 
 
 @app.cell
 def _(pd):
-    train_df = pd.read_pickle("train_df_full.pkl")
-    return (train_df,)
+    train_full = pd.read_pickle("train_full.pkl")
+    return (train_full,)
 
 
 @app.cell
 def _(pd):
-    validate_df = pd.read_pickle("validate_df_full.pkl")
-    return (validate_df,)
+    validate_full = pd.read_pickle("validate_full.pkl")
+    return (validate_full,)
 
 
 @app.cell(disabled=True)
 def _(pd):
-    test_df = pd.read_pickle("test_df_full.pkl")
-    return (test_df,)
+    test_full = pd.read_pickle("test_full.pkl")
+    return (test_full,)
 
 
 @app.cell
 def _(json):
     with open("features_list_full.json", 'r', encoding="UTF-8") as fin:
-        features_list = json.load(fin)
-    return (features_list,)
+        features_list_full = json.load(fin)
+    return (features_list_full,)
 
 
 @app.cell(hide_code=True)
@@ -149,11 +191,19 @@ def _(mo):
 
 @app.cell
 def _():
+    from sklearn import set_config
+    set_config(transform_output="pandas")
+    return
+
+
+@app.cell
+def _():
+    from sklearn.feature_selection import VarianceThreshold
     from sklearn.preprocessing import StandardScaler
     from sklearn.metrics import roc_auc_score
     from sklearn.model_selection import train_test_split
     import xgboost as xgb
-    return StandardScaler, roc_auc_score, xgb
+    return StandardScaler, VarianceThreshold, roc_auc_score, xgb
 
 
 @app.cell
