@@ -119,7 +119,7 @@ def _(features_list, model, pd):
     return (feature_importance,)
 
 
-@app.cell(disabled=True)
+@app.cell
 def _(feature_importance, json):
     with open("top_sm_features.json", 'w', encoding="UTF-8") as fout:
         json.dump(list(feature_importance["Feature"]), fout)
@@ -176,25 +176,25 @@ def _(
 
             train_df = full_df[features_list].copy()
             train_df["TARGET"] = train_full["TARGET"]
-        
+
             validate_df = validate_full[features_list].copy()
             validate_df["TARGET"] = validate_full["TARGET"]
-        
+
             train_features = train_df[features_list]
             train_target = train_df['TARGET'].astype(int)
-        
+
             scaler = StandardScaler()
             train_features_scaled = scaler.fit_transform(train_features)
-        
+
             model = LogisticRegression(random_state=32, max_iter=100, class_weight='balanced')
             model.fit(train_features_scaled, train_target)
-        
+
             validate_features = validate_df[features_list]
             validate_target = validate_df['TARGET'].astype(int)
-        
+
             validate_features_scaled = scaler.transform(validate_features)
             validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
-        
+
             validate_gini = gini(roc_auc_score(validate_target, validate_proba))
             if validate_gini > top_gini:
                 top_features = features_list
@@ -236,28 +236,28 @@ def _(
             features_list = deepcopy(top_features)
             for feature in mo.status.progress_bar(pool_of_features, title="Перевірка наступної фічі", remove_on_exit=True):
                 features_list.append(feature)
-    
+
                 train_df = full_df[features_list]
                 train_df["TARGET"] = train_full["TARGET"]
-            
+
                 validate_df = validate_full[features_list]
                 validate_df["TARGET"] = validate_full["TARGET"]
-            
+
                 train_features = train_df[features_list]
                 train_target = train_df['TARGET'].astype(int)
-            
+
                 scaler = StandardScaler()
                 train_features_scaled = scaler.fit_transform(train_features)
-            
+
                 model = LogisticRegression(random_state=32, max_iter=100, class_weight='balanced')
                 model.fit(train_features_scaled, train_target)
-            
+
                 validate_features = validate_df[features_list]
                 validate_target = validate_df['TARGET'].astype(int)
-            
+
                 validate_features_scaled = scaler.transform(validate_features)
                 validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
-            
+
                 validate_gini = gini(roc_auc_score(validate_target, validate_proba))
                 if validate_gini > top_gini:
                     top_gini = validate_gini
@@ -293,28 +293,28 @@ def _(
             features_list = deepcopy(pool_of_features)
             for feature in mo.status.progress_bar(pool_of_features, title="Перевірка наступної фічі", remove_on_exit=True):
                 features_list.remove(feature)
-    
+
                 train_df = full_df[features_list]
                 train_df["TARGET"] = train_full["TARGET"]
-            
+
                 validate_df = validate_full[features_list]
                 validate_df["TARGET"] = validate_full["TARGET"]
-            
+
                 train_features = train_df[features_list]
                 train_target = train_df['TARGET'].astype(int)
-            
+
                 scaler = StandardScaler()
                 train_features_scaled = scaler.fit_transform(train_features)
-            
+
                 model = LogisticRegression(random_state=32, max_iter=100, class_weight='balanced')
                 model.fit(train_features_scaled, train_target)
-            
+
                 validate_features = validate_df[features_list]
                 validate_target = validate_df['TARGET'].astype(int)
-            
+
                 validate_features_scaled = scaler.transform(validate_features)
                 validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
-            
+
                 validate_gini = gini(roc_auc_score(validate_target, validate_proba))
                 if validate_gini > top_gini:
                     top_gini = validate_gini
@@ -325,7 +325,7 @@ def _(
 
     removal_search_features = removal_search(top_decorr_columns)
     save_json(removal_search_features, f"removal_search_features.json")
-    return (removal_search_features,)
+    return
 
 
 @app.cell
@@ -369,11 +369,16 @@ def _(VarianceThreshold, deduplicated_df):
 
 
 @app.cell
-def _(full_df, removal_search_features, train_full):
-    train_df = full_df[removal_search_features].copy()
-    features_list = train_df.columns
+def _(load_json):
+    features_list = load_json("removal_search_features.json")
+    return (features_list,)
+
+
+@app.cell
+def _(features_list, full_df, train_full):
+    train_df = full_df[features_list].copy()
     train_df["TARGET"] = train_full["TARGET"]
-    return features_list, train_df
+    return (train_df,)
 
 
 @app.cell
