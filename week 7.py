@@ -158,19 +158,20 @@ def _(mo):
 def _(
     LogisticRegression,
     StandardScaler,
-    features_list_full,
+    full_df,
     get_random_columns,
     minutes_search_input,
+    mo,
     roc_auc_score,
+    save_json,
     top_decorr_columns,
     train_full,
     validate_full,
 ):
     def find_best_model(columns, minutes=1):
-        full_df = train_full[features_list_full]
         top_gini = 0
         top_features = []
-        for i in range(int(minutes * 400)):
+        for i in mo.status.progress_bar(range(int(minutes * 400)), title="Спроби"):
             features_list = get_random_columns(columns)
 
             train_df = full_df[features_list].copy()
@@ -201,17 +202,130 @@ def _(
         return top_features
 
     best_features = find_best_model(top_decorr_columns, minutes_search_input.value)
-    return (best_features,)
+    save_json(best_features, f"{minutes_search_input.value}m_top_selected_50_features.json")
+    return
 
 
 @app.cell
-def _(best_features, json, minutes_search_input):
+def _(json):
     def save_json(object, filename):
         with open(filename, 'w', encoding="UTF-8") as fout:
             json.dump(object, fout, ensure_ascii=False)
+    return (save_json,)
 
-    save_json(best_features, f"{minutes_search_input.value}m_top_selected_50_features.json")
+
+@app.cell(disabled=True)
+def _(
+    LogisticRegression,
+    StandardScaler,
+    deepcopy,
+    full_df,
+    mo,
+    roc_auc_score,
+    save_json,
+    top_decorr_columns,
+    train_full,
+    validate_full,
+):
+    def bottom_search(columns):
+        pool_of_features = set(columns)
+        top_features = []
+        for i in mo.status.progress_bar(range(50), title="Кількість фіч у моделі"):
+            top_gini = 0
+            top_feature = ''
+            features_list = deepcopy(top_features)
+            for feature in mo.status.progress_bar(pool_of_features, title="Перевірка наступної фічі", remove_on_exit=True):
+                features_list.append(feature)
+    
+                train_df = full_df[features_list]
+                train_df["TARGET"] = train_full["TARGET"]
+            
+                validate_df = validate_full[features_list]
+                validate_df["TARGET"] = validate_full["TARGET"]
+            
+                train_features = train_df[features_list]
+                train_target = train_df['TARGET'].astype(int)
+            
+                scaler = StandardScaler()
+                train_features_scaled = scaler.fit_transform(train_features)
+            
+                model = LogisticRegression(random_state=32, max_iter=100, class_weight='balanced')
+                model.fit(train_features_scaled, train_target)
+            
+                validate_features = validate_df[features_list]
+                validate_target = validate_df['TARGET'].astype(int)
+            
+                validate_features_scaled = scaler.transform(validate_features)
+                validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
+            
+                validate_gini = gini(roc_auc_score(validate_target, validate_proba))
+                if validate_gini > top_gini:
+                    top_gini = validate_gini
+                    top_feature = feature
+                features_list.remove(feature)
+            pool_of_features.remove(top_feature)
+            top_features.append(top_feature)
+        return top_features
+
+    bottom_search_features = bottom_search(top_decorr_columns)
+    save_json(bottom_search_features, f"bottom_search_features.json")
     return
+
+
+@app.cell(disabled=True)
+def _(
+    LogisticRegression,
+    StandardScaler,
+    deepcopy,
+    full_df,
+    mo,
+    roc_auc_score,
+    save_json,
+    top_decorr_columns,
+    train_full,
+    validate_full,
+):
+    def removal_search(columns):
+        pool_of_features = deepcopy(columns)
+        for i in mo.status.progress_bar(range(len(columns) - 50), title="Кількість прибраних фіч"):
+            top_gini = 0
+            worst_feature = ''
+            features_list = deepcopy(pool_of_features)
+            for feature in mo.status.progress_bar(pool_of_features, title="Перевірка наступної фічі", remove_on_exit=True):
+                features_list.remove(feature)
+    
+                train_df = full_df[features_list]
+                train_df["TARGET"] = train_full["TARGET"]
+            
+                validate_df = validate_full[features_list]
+                validate_df["TARGET"] = validate_full["TARGET"]
+            
+                train_features = train_df[features_list]
+                train_target = train_df['TARGET'].astype(int)
+            
+                scaler = StandardScaler()
+                train_features_scaled = scaler.fit_transform(train_features)
+            
+                model = LogisticRegression(random_state=32, max_iter=100, class_weight='balanced')
+                model.fit(train_features_scaled, train_target)
+            
+                validate_features = validate_df[features_list]
+                validate_target = validate_df['TARGET'].astype(int)
+            
+                validate_features_scaled = scaler.transform(validate_features)
+                validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
+            
+                validate_gini = gini(roc_auc_score(validate_target, validate_proba))
+                if validate_gini > top_gini:
+                    top_gini = validate_gini
+                    worst_feature = feature
+                features_list.append(feature)
+            pool_of_features.remove(worst_feature)
+        return pool_of_features
+
+    removal_search_features = removal_search(top_decorr_columns)
+    save_json(removal_search_features, f"removal_search_features.json")
+    return (removal_search_features,)
 
 
 @app.cell
@@ -255,8 +369,8 @@ def _(VarianceThreshold, deduplicated_df):
 
 
 @app.cell
-def _(best_features, full_df, train_full):
-    train_df = full_df[best_features].copy()
+def _(full_df, removal_search_features, train_full):
+    train_df = full_df[removal_search_features].copy()
     features_list = train_df.columns
     train_df["TARGET"] = train_full["TARGET"]
     return features_list, train_df
@@ -352,7 +466,8 @@ def _():
     import duckdb
     import json
     import random
-    return json, mo, np, pd, random
+    from copy import deepcopy
+    return deepcopy, json, mo, np, pd, random
 
 
 if __name__ == "__main__":
