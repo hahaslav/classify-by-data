@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.18.0"
+__generated_with = "0.18.4"
 app = marimo.App(width="full")
 
 
@@ -116,6 +116,22 @@ def _(mo):
     mo.md(r"""
     ## Підготовка згенерованих датасетів до тренування
     """)
+    return
+
+
+@app.cell
+def _():
+    import json
+
+    def save_json(object, filename):
+        with open(filename, 'w', encoding="UTF-8") as fout:
+            json.dump(object, fout, ensure_ascii=False)
+    return (save_json,)
+
+
+@app.cell
+def _(features_list, save_json):
+    save_json(features_list, "old_best_features.json")
     return
 
 

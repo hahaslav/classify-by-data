@@ -214,7 +214,7 @@ def _(json):
     return (save_json,)
 
 
-@app.cell(disabled=True)
+@app.cell
 def _(
     LogisticRegression,
     StandardScaler,
@@ -222,8 +222,6 @@ def _(
     full_df,
     mo,
     roc_auc_score,
-    save_json,
-    top_decorr_columns,
     train_full,
     validate_full,
 ):
@@ -237,10 +235,10 @@ def _(
             for feature in mo.status.progress_bar(pool_of_features, title="Перевірка наступної фічі", remove_on_exit=True):
                 features_list.append(feature)
 
-                train_df = full_df[features_list]
+                train_df = full_df[features_list].copy()
                 train_df["TARGET"] = train_full["TARGET"]
 
-                validate_df = validate_full[features_list]
+                validate_df = validate_full[features_list].copy()
                 validate_df["TARGET"] = validate_full["TARGET"]
 
                 train_features = train_df[features_list]
@@ -266,7 +264,11 @@ def _(
             pool_of_features.remove(top_feature)
             top_features.append(top_feature)
         return top_features
+    return (bottom_search,)
 
+
+@app.cell(disabled=True)
+def _(bottom_search, save_json, top_decorr_columns):
     bottom_search_features = bottom_search(top_decorr_columns)
     save_json(bottom_search_features, f"bottom_search_features.json")
     return
@@ -329,29 +331,54 @@ def _(
 
 
 @app.cell
-def _(full_df, load_json):
-    top_features_columns = load_json("top_100_features.json")
-    top_feat_df = full_df[top_features_columns]
-    return (top_feat_df,)
+def _(load_json):
+    old_best_features = load_json("old_best_features.json")
+    return (old_best_features,)
 
 
 @app.cell
-def _(top_feat_df):
-    corr_matrix = top_feat_df.corr().abs()
+def _(old_best_features, top_decorr_columns):
+    combined_features = list(set(old_best_features).union(set(top_decorr_columns)))
+    return (combined_features,)
+
+
+@app.cell
+def _(combined_features, train_full):
+    combined_train = train_full[combined_features]
+    return (combined_train,)
+
+
+@app.cell(disabled=True)
+def _(bottom_search, decorr_df, save_json):
+    combined_bottom_search_features = bottom_search(decorr_df.columns)
+    save_json(combined_bottom_search_features, f"combined_bottom_search_features.json")
+    return (combined_bottom_search_features,)
+
+
+@app.cell
+def _(full_df, load_json):
+    top_features_columns = load_json("top_100_features.json")
+    top_feat_df = full_df[top_features_columns]
+    return
+
+
+@app.cell
+def _(variance_df):
+    corr_matrix = variance_df.corr().abs()
     return (corr_matrix,)
 
 
 @app.cell
-def _(corr_matrix, np, top_feat_df):
+def _(corr_matrix, np, variance_df):
     corr_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
     corr_to_drop = [c for c in corr_triangle.columns if any(corr_triangle[c] > 0.7)]
-    decorr_df = top_feat_df.drop(columns=corr_to_drop)
-    return
+    decorr_df = variance_df.drop(columns=corr_to_drop)
+    return (decorr_df,)
 
 
-@app.cell(disabled=True)
-def _(full_df):
-    deduplicated_df = full_df.T.drop_duplicates().T
+@app.cell
+def _(combined_train):
+    deduplicated_df = combined_train.T.drop_duplicates().T
     return (deduplicated_df,)
 
 
@@ -365,12 +392,12 @@ def _(features_list_full, train_full):
 def _(VarianceThreshold, deduplicated_df):
     variance_filter = VarianceThreshold(threshold=0.01)
     variance_df = variance_filter.fit_transform(deduplicated_df)
-    return
+    return (variance_df,)
 
 
 @app.cell
-def _(load_json):
-    features_list = load_json("removal_search_features.json")
+def _(combined_bottom_search_features):
+    features_list = combined_bottom_search_features
     return (features_list,)
 
 
@@ -388,7 +415,7 @@ def _(features_list, validate_full):
     return (validate_df,)
 
 
-@app.cell
+@app.cell(disabled=True)
 def _(features_list, test_full):
     test_df = test_full[features_list].copy()
     test_df["TARGET"] = test_full["TARGET"]
@@ -415,7 +442,7 @@ def _(pd):
     return (validate_full,)
 
 
-@app.cell(disabled=True)
+@app.cell
 def _(pd):
     test_full = pd.read_pickle("test_full.pkl")
     return (test_full,)
