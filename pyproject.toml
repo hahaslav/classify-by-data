@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
     "duckdb>=1.4.2",
+    "feature-engine>=1.9.3",
     "marimo>=0.17.8",
     "matplotlib>=3.10.7",
     "scikit-learn>=1.7.2",

@@ -189,6 +189,22 @@ wheels = [
 ]
 
 [[package]]
+name = "feature-engine"
+version = "1.9.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "statsmodels" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4c/e4/218f03dfaff903262097ae78254022bbeba1f8e4a43d1a6757e5717d0e3b/feature_engine-1.9.3.tar.gz", hash = "sha256:7ff8b56e071f22f93c117589a63b8b090d46d138a111edbbf4928dff07c5018b", size = 142045, upload-time = "2025-08-28T17:16:00.693Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/04/06f8f92663e98f000d427a3e2ce20a2bcdc0119e30b4f97b918ee0f80fe4/feature_engine-1.9.3-py3-none-any.whl", hash = "sha256:9cbf0f1791a27772963fbe2efac3a44a16df030d1a191b9aade3b22f033e706a", size = 229977, upload-time = "2025-08-28T17:15:59.428Z" },
+]
+
+[[package]]
 name = "fonttools"
 version = "4.60.1"
 source = { registry = "https://pypi.org/simple" }
@@ -714,6 +730,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "duckdb" },
+    { name = "feature-engine" },
     { name = "marimo" },
     { name = "matplotlib" },
     { name = "scikit-learn" },
@@ -726,6 +743,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "duckdb", specifier = ">=1.4.2" },
+    { name = "feature-engine", specifier = ">=1.9.3" },
     { name = "marimo", specifier = ">=0.17.8" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
