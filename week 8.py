@@ -122,7 +122,7 @@ def _(features_list, model, pd):
 @app.cell
 def _(feature_importance, json):
     with open("top_sm_features.json", 'w', encoding="UTF-8") as fout:
-        json.dump(list(feature_importance["Feature"]), fout)
+        json.dump(list(feature_importance["Feature"][:200]), fout)
     return
 
 
@@ -142,7 +142,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(disabled=True)
 def _(train_all_features):
     deduplicated_df = train_all_features.T.drop_duplicates().T
     return (deduplicated_df,)
@@ -360,14 +360,21 @@ def _(
                 features_list.append(feature)
             pool_of_features.remove(worst_feature)
         return pool_of_features
+    return (removal_search,)
+
+
+@app.cell(disabled=True)
+def _(bottom_search, load_json, save_json):
+    smart_decorr_bottom = bottom_search(load_json("smart_decorr_features.json"))
+    save_json(smart_decorr_bottom, "smart_decorr_bottom.json")
     return
 
 
 @app.cell
-def _(bottom_search, load_json, save_json):
-    week_8_features = bottom_search(load_json("smart_decorr_features.json"))
-    save_json(week_8_features, "week_8_features.json")
-    return (week_8_features,)
+def _(load_json, removal_search, save_json):
+    removal_smart_decorr_features = removal_search(load_json("smart_decorr_top_200_features.json"))
+    save_json(removal_smart_decorr_features, "removal_smart_decorr_features.json")
+    return (removal_smart_decorr_features,)
 
 
 @app.cell(hide_code=True)
@@ -379,8 +386,8 @@ def _(mo):
 
 
 @app.cell
-def _(week_8_features):
-    features_list = week_8_features
+def _(removal_smart_decorr_features):
+    features_list = removal_smart_decorr_features
     return (features_list,)
 
 
@@ -398,7 +405,7 @@ def _(features_list, validate_full):
     return (validate_df,)
 
 
-@app.cell(disabled=True)
+@app.cell
 def _(features_list, test_full):
     test_df = test_full[features_list].copy()
     test_df["TARGET"] = test_full["TARGET"]
