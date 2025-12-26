@@ -120,9 +120,8 @@ def _(features_list, model, pd):
 
 
 @app.cell
-def _(feature_importance, json):
-    with open("top_sm_features.json", 'w', encoding="UTF-8") as fout:
-        json.dump(list(feature_importance["Feature"][:200]), fout)
+def _(feature_importance, save_json):
+    save_json(list(feature_importance["Feature"][:200]), "top_sm_features.json")
     return
 
 
