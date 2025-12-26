@@ -346,7 +346,7 @@ def _(
 
                 model = LogisticRegression(random_state=32, max_iter=100, class_weight='balanced')
                 model.fit(train_features_scaled, train_target)
-            
+
                 train_proba = model.predict_proba(train_features_scaled)[:, 1]
 
                 validate_features = validate_df[features_list]
@@ -354,7 +354,7 @@ def _(
 
                 validate_features_scaled = scaler.transform(validate_features)
                 validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
-            
+
                 train_gini = gini(roc_auc_score(train_target, train_proba))
                 validate_gini = gini(roc_auc_score(validate_target, validate_proba))
                 comparison_gini = min(train_gini, validate_gini)
@@ -374,11 +374,11 @@ def _(bottom_search, load_json, save_json):
     return
 
 
-@app.cell
+@app.cell(disabled=True)
 def _(load_json, removal_search, save_json):
     removal_smart_decorr_features = removal_search(load_json("smart_decorr_top_200_features.json"))
     save_json(removal_smart_decorr_features, "removal_smart_decorr_features.json")
-    return (removal_smart_decorr_features,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -390,8 +390,8 @@ def _(mo):
 
 
 @app.cell
-def _(removal_smart_decorr_features):
-    features_list = removal_smart_decorr_features
+def _(load_json):
+    features_list = load_json("smart_decorr_bottom.json")
     return (features_list,)
 
 
@@ -409,7 +409,7 @@ def _(features_list, validate_full):
     return (validate_df,)
 
 
-@app.cell
+@app.cell(disabled=True)
 def _(features_list, test_full):
     test_df = test_full[features_list].copy()
     test_df["TARGET"] = test_full["TARGET"]
