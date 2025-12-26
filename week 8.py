@@ -346,16 +346,20 @@ def _(
 
                 model = LogisticRegression(random_state=32, max_iter=100, class_weight='balanced')
                 model.fit(train_features_scaled, train_target)
+            
+                train_proba = model.predict_proba(train_features_scaled)[:, 1]
 
                 validate_features = validate_df[features_list]
                 validate_target = validate_df['TARGET'].astype(int)
 
                 validate_features_scaled = scaler.transform(validate_features)
                 validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
-
+            
+                train_gini = gini(roc_auc_score(train_target, train_proba))
                 validate_gini = gini(roc_auc_score(validate_target, validate_proba))
-                if validate_gini > top_gini:
-                    top_gini = validate_gini
+                comparison_gini = min(train_gini, validate_gini)
+                if comparison_gini > top_gini:
+                    top_gini = comparison_gini
                     worst_feature = feature
                 features_list.append(feature)
             pool_of_features.remove(worst_feature)
