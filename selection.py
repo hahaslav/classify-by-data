@@ -1,0 +1,538 @@
+import marimo
+
+__generated_with = "0.18.4"
+app = marimo.App(width="full")
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Бібліотеки
+    """)
+    return
+
+
+@app.cell
+def _():
+    from feature_engine.selection import DropHighPSIFeatures
+    return (DropHighPSIFeatures,)
+
+
+@app.cell
+def _():
+    from sklearn import set_config
+    set_config(transform_output="pandas")
+    return
+
+
+@app.cell
+def _():
+    from sklearn.feature_selection import VarianceThreshold
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.metrics import roc_auc_score
+    from sklearn.model_selection import train_test_split
+    from sklearn.linear_model import LogisticRegression
+    return LogisticRegression, StandardScaler, VarianceThreshold, roc_auc_score
+
+
+@app.cell
+def _():
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    return plt, sns
+
+
+@app.cell
+def _():
+    import marimo as mo
+    import pandas as pd
+    import numpy as np
+    import duckdb
+    import json
+    from copy import deepcopy
+    return deepcopy, json, mo, np, pd
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Завантаження згенерованих датасетів
+    """)
+    return
+
+
+@app.cell
+def _(pd):
+    train_full = pd.read_pickle("train_full.pkl")
+    return (train_full,)
+
+
+@app.cell
+def _(pd):
+    validate_full = pd.read_pickle("validate_full.pkl")
+    return (validate_full,)
+
+
+@app.cell
+def _(pd):
+    test_full = pd.read_pickle("test_full.pkl")
+    return (test_full,)
+
+
+@app.cell
+def _(load_json):
+    features_list_full = load_json("features_list_full.json")
+    return (features_list_full,)
+
+
+@app.cell
+def _(features_list_full, train_full):
+    train_all_features = train_full[features_list_full]
+    return (train_all_features,)
+
+
+@app.cell
+def _(json):
+    def load_json(filename):
+        with open(filename, 'r', encoding="UTF-8") as fin:
+            return json.load(fin)
+    return (load_json,)
+
+
+@app.cell
+def _(json):
+    def save_json(object, filename):
+        with open(filename, 'w', encoding="UTF-8") as fout:
+            json.dump(object, fout, ensure_ascii=False)
+    return (save_json,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Очищення датасетів
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Дедуплікація
+    """)
+    return
+
+
+@app.cell(disabled=True)
+def _(train_all_features):
+    deduplicated_df = train_all_features.T.drop_duplicates().T
+    return (deduplicated_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Фільтрування по дисперсії
+    """)
+    return
+
+
+@app.cell
+def _(VarianceThreshold, deduplicated_df):
+    variance_filter = VarianceThreshold(threshold=0.01)
+    variance_df = variance_filter.fit_transform(deduplicated_df)
+    return (variance_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Фільтрування за PSI
+    """)
+    return
+
+
+@app.cell(disabled=True)
+def _(variance_df):
+    psi_features_to_filter_list = variance_df.columns
+    return (psi_features_to_filter_list,)
+
+
+@app.cell
+def _(pd, psi_features_to_filter_list, train_full, validate_full):
+    psi_train = train_full[psi_features_to_filter_list].copy()
+    psi_validate = validate_full[psi_features_to_filter_list].copy()
+
+    psi_train["split"] = 0
+    psi_validate["split"] = 1
+
+    psi_df = pd.concat([psi_train, psi_validate])
+    return (psi_df,)
+
+
+@app.cell
+def _(DropHighPSIFeatures, psi_df, psi_features_to_filter_list):
+    psi_selector = DropHighPSIFeatures(split_col="split", cut_off=0, threshold=0.1, bins=10)
+    psi_selector.fit(psi_df)
+    psi_passed_features = list(set(psi_features_to_filter_list) - set(psi_selector.features_to_drop_))
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Фільтрування по кореляції
+    """)
+    return
+
+
+@app.cell(disabled=True)
+def _(np, pd):
+    def splitted_correlation(df, n, target):
+        target_corrs = df.corrwith(target).abs()
+        end_split = 0
+        result_dfs = []
+        while end_split < len(df.columns):
+            begin_split = end_split
+            end_split += n
+            split_df = df[df.columns[begin_split:end_split]]
+            corr_matrix = split_df.corr().abs()
+            corr_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+            corr_to_drop = set()
+            corr_columns = corr_triangle.columns
+            for i in range(len(corr_columns)):
+                for j in range(i + 1, len(corr_columns)):
+                    if corr_matrix.loc[corr_columns[i], corr_columns[j]] < 0.7:
+                        continue
+                    if corr_columns[i] in corr_to_drop or corr_columns[j] in corr_to_drop:
+                        continue
+                    if target_corrs[corr_columns[i]] < target_corrs[corr_columns[j]]:
+                        corr_to_drop.add(corr_columns[i])
+                    else:
+                        corr_to_drop.add(corr_columns[j])
+            decorr_df = split_df.drop(columns=corr_to_drop)
+            result_dfs.append(decorr_df)
+        return pd.concat(result_dfs, axis=1)
+    return (splitted_correlation,)
+
+
+@app.cell
+def _(splitted_correlation, train_full, variance_df):
+    cor_1 = splitted_correlation(variance_df, 500, train_full["TARGET"])
+    return (cor_1,)
+
+
+@app.cell
+def _(cor_1, splitted_correlation, train_full):
+    smart_decorr_df = splitted_correlation(cor_1, len(cor_1.columns), train_full["TARGET"])
+    return (smart_decorr_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Тут і далі, деякі списки відібраних фіч кешуються
+    """)
+    return
+
+
+@app.cell
+def _(save_json, smart_decorr_df):
+    save_json(list(smart_decorr_df.columns), "smart_decorr_features.json")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Послідовний перебір
+    """)
+    return
+
+
+@app.cell
+def _(
+    LogisticRegression,
+    StandardScaler,
+    deepcopy,
+    mo,
+    roc_auc_score,
+    train_full,
+    validate_full,
+):
+    def bottom_search(columns):
+        pool_of_features = set(columns)
+        top_features = []
+        for i in mo.status.progress_bar(range(50), title="Кількість фіч у моделі"):
+            top_gini = 0
+            top_feature = ''
+            features_list = deepcopy(top_features)
+            for feature in mo.status.progress_bar(pool_of_features, title="Перевірка наступної фічі", remove_on_exit=True):
+                features_list.append(feature)
+
+                train_df = train_full[features_list].copy()
+                train_df["TARGET"] = train_full["TARGET"]
+
+                validate_df = validate_full[features_list].copy()
+                validate_df["TARGET"] = validate_full["TARGET"]
+
+                train_features = train_df[features_list]
+                train_target = train_df['TARGET'].astype(int)
+
+                scaler = StandardScaler()
+                train_features_scaled = scaler.fit_transform(train_features)
+
+                model = LogisticRegression(random_state=32, max_iter=100, class_weight='balanced')
+                model.fit(train_features_scaled, train_target)
+
+                validate_features = validate_df[features_list]
+                validate_target = validate_df['TARGET'].astype(int)
+
+                validate_features_scaled = scaler.transform(validate_features)
+                validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
+
+                validate_gini = gini(roc_auc_score(validate_target, validate_proba))
+                if validate_gini > top_gini:
+                    top_gini = validate_gini
+                    top_feature = feature
+                features_list.remove(feature)
+            pool_of_features.remove(top_feature)
+            top_features.append(top_feature)
+        return top_features
+    return (bottom_search,)
+
+
+@app.cell
+def _(
+    LogisticRegression,
+    StandardScaler,
+    deepcopy,
+    mo,
+    roc_auc_score,
+    train_full,
+    validate_full,
+):
+    def removal_search(columns):
+        pool_of_features = deepcopy(columns)
+        for i in mo.status.progress_bar(range(len(columns) - 50), title="Кількість прибраних фіч"):
+            top_gini = 0
+            worst_feature = ''
+            features_list = deepcopy(pool_of_features)
+            for feature in mo.status.progress_bar(pool_of_features, title="Перевірка наступної фічі", remove_on_exit=True):
+                features_list.remove(feature)
+
+                train_df = train_full[features_list]
+                train_df["TARGET"] = train_full["TARGET"]
+
+                validate_df = validate_full[features_list]
+                validate_df["TARGET"] = validate_full["TARGET"]
+
+                train_features = train_df[features_list]
+                train_target = train_df['TARGET'].astype(int)
+
+                scaler = StandardScaler()
+                train_features_scaled = scaler.fit_transform(train_features)
+
+                model = LogisticRegression(random_state=32, max_iter=100, class_weight='balanced')
+                model.fit(train_features_scaled, train_target)
+
+                train_proba = model.predict_proba(train_features_scaled)[:, 1]
+
+                validate_features = validate_df[features_list]
+                validate_target = validate_df['TARGET'].astype(int)
+
+                validate_features_scaled = scaler.transform(validate_features)
+                validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
+
+                train_gini = gini(roc_auc_score(train_target, train_proba))
+                validate_gini = gini(roc_auc_score(validate_target, validate_proba))
+                comparison_gini = min(train_gini, validate_gini)
+                if comparison_gini > top_gini:
+                    top_gini = comparison_gini
+                    worst_feature = feature
+                features_list.append(feature)
+            pool_of_features.remove(worst_feature)
+        return pool_of_features
+    return (removal_search,)
+
+
+@app.cell(disabled=True)
+def _(bottom_search, load_json, save_json):
+    smart_decorr_bottom = bottom_search(load_json("smart_decorr_features.json"))
+    save_json(smart_decorr_bottom, "smart_decorr_bottom.json")
+    return
+
+
+@app.cell(disabled=True)
+def _(load_json, removal_search, save_json):
+    removal_smart_decorr_features = removal_search(load_json("smart_decorr_top_200_features.json"))
+    save_json(removal_smart_decorr_features, "removal_smart_decorr_features.json")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Підготування датасетів з відібраними фічами
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Кешований список відібраних фіч завантажується тут для створення моделі на його основі
+    """)
+    return
+
+
+@app.cell
+def _(load_json):
+    features_list = load_json("smart_decorr_bottom.json")
+    return (features_list,)
+
+
+@app.cell
+def _(features_list, train_full):
+    train_df = train_full[features_list].copy()
+    train_df["TARGET"] = train_full["TARGET"]
+    return (train_df,)
+
+
+@app.cell
+def _(features_list, validate_full):
+    validate_df = validate_full[features_list].copy()
+    validate_df["TARGET"] = validate_full["TARGET"]
+    return (validate_df,)
+
+
+@app.cell(disabled=True)
+def _(features_list, test_full):
+    test_df = test_full[features_list].copy()
+    test_df["TARGET"] = test_full["TARGET"]
+    return (test_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Модель
+    """)
+    return
+
+
+@app.function
+def gini(roc_auc):
+    return 2 * roc_auc - 1
+
+
+@app.cell
+def _(
+    LogisticRegression,
+    StandardScaler,
+    features_list,
+    roc_auc_score,
+    train_df,
+    validate_df,
+):
+    train_features = train_df[features_list]
+    train_target = train_df['TARGET'].astype(int)
+
+    scaler = StandardScaler()
+    train_features_scaled = scaler.fit_transform(train_features)
+
+    model = LogisticRegression(random_state=32, max_iter=1200, class_weight='balanced')
+    model.fit(train_features_scaled, train_target)
+
+    train_proba = model.predict_proba(train_features_scaled)[:, 1]
+
+    validate_features = validate_df[features_list]
+    validate_target = validate_df['TARGET'].astype(int)
+
+    validate_features_scaled = scaler.transform(validate_features)
+    validate_proba = model.predict_proba(validate_features_scaled)[:, 1]
+
+    train_gini = gini(roc_auc_score(train_target, train_proba))
+    validate_gini = gini(roc_auc_score(validate_target, validate_proba))
+    return model, scaler, train_gini, validate_gini
+
+
+@app.cell
+def _(features_list, model, roc_auc_score, scaler, test_df):
+    test_features = test_df[features_list]
+    test_target = test_df['TARGET'].astype(int)
+
+    test_features_scaled = scaler.transform(test_features)
+    test_proba = model.predict_proba(test_features_scaled)[:, 1]
+
+    test_gini = gini(roc_auc_score(test_target, test_proba))
+    print(f"Тестова вибірка: {test_gini:.4f}")
+    return
+
+
+@app.cell(hide_code=True)
+def _(features_list, mo, train_gini, validate_gini):
+    mo.md(rf"""
+    ## Коефіцієнти Gini
+
+    Тренувальна вибірка: {train_gini:.4f}
+
+    Валідаційна вибірка: {validate_gini:.4f}
+
+    Усього фіч: {len(features_list)}
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Feature Importance
+    """)
+    return
+
+
+@app.cell
+def _(features_list, model, pd):
+    coefficients = model.coef_[0]
+
+    feature_importance = pd.DataFrame({
+        'Feature': features_list,
+        'Coefficient': coefficients
+    })
+
+    feature_importance['Absolute Coefficient'] = feature_importance['Coefficient'].abs()
+
+    feature_importance = feature_importance.sort_values(
+        by='Absolute Coefficient', 
+        ascending=False
+    )
+    return (feature_importance,)
+
+
+@app.cell
+def _(feature_importance, features_list, plt, sns):
+    sns.set_style("whitegrid")
+
+    top_n_features = min(300, len(features_list))
+
+    plt.rcParams["figure.dpi"] = 120
+    plt.figure(figsize=(10, top_n_features / 4.5))
+
+    sns.barplot(x='Coefficient', y='Feature', data=feature_importance.head(top_n_features))
+
+    plt.title('Feature Importance')
+    plt.xlabel('Coefficient Value')
+    plt.ylabel('Feature')
+    plt.gca()
+    return
+
+
+@app.cell
+def _(feature_importance, save_json):
+    save_json(list(feature_importance["Feature"][:200]), "top_sm_features.json")
+    return
+
+
+if __name__ == "__main__":
+    app.run()
